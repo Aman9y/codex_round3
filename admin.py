@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, Response, jsonify
 import sqlite3
 import json
 import random
@@ -6,6 +6,8 @@ import secrets
 import csv
 import io
 import bcrypt
+import time
+from datetime import datetime
 from functools import wraps
 
 app = Flask(__name__)
@@ -204,6 +206,69 @@ def download_violations_csv():
         headers={'Content-Disposition': 'attachment; filename=violations.csv'}
     )
 
+@app.route('/timer')
+@admin_required
+def timer_control():
+    conn = get_db()
+    
+    # Get current timer status
+    try:
+        config = conn.execute('SELECT key, value FROM contest_config WHERE key IN ("contest_start_time", "contest_duration")').fetchall()
+        config_dict = {row['key']: int(row['value']) for row in config}
+    except:
+        config_dict = {'contest_start_time': 0, 'contest_duration': 0}
+    
+    start_time = config_dict.get('contest_start_time', 0)
+    duration = config_dict.get('contest_duration', 0)
+    
+    status = {
+        'started': start_time > 0,
+        'start_time': start_time,
+        'duration': duration,
+        'duration_hours': duration // 3600,
+        'duration_minutes': (duration % 3600) // 60
+    }
+    
+    if start_time > 0:
+        elapsed = int(time.time()) - start_time
+        remaining = max(0, duration - elapsed)
+        status.update({
+            'elapsed': elapsed,
+            'remaining': remaining,
+            'finished': remaining == 0
+        })
+    
+    conn.close()
+    return render_template('admin/timer.html', status=status)
+
+@app.route('/timer/control', methods=['POST'])
+@admin_required
+def timer_action():
+    action = request.json.get('action')
+    
+    conn = get_db()
+    
+    try:
+        if action == 'start':
+            conn.execute('INSERT OR REPLACE INTO contest_config (key, value) VALUES ("contest_start_time", ?)', 
+                       (str(int(time.time())),))
+        elif action == 'reset':
+            conn.execute('INSERT OR REPLACE INTO contest_config (key, value) VALUES ("contest_start_time", "0")')
+        elif action == 'extend':
+            minutes = request.json.get('minutes', 30)
+            result = conn.execute('SELECT value FROM contest_config WHERE key = "contest_duration"').fetchone()
+            current_duration = int(result['value']) if result else 0
+            new_duration = current_duration + (minutes * 60)
+            conn.execute('INSERT OR REPLACE INTO contest_config (key, value) VALUES ("contest_duration", ?)', 
+                       (str(new_duration),))
+        
+        conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+    finally:
+        conn.close()
+
 @app.route('/randomization')
 def view_randomization():
     conn = get_db()
@@ -241,4 +306,4 @@ def view_randomization():
     '''
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5123, debug=True)
+    app.run( port=5123, debug=True) #host='0.0.0.0' for external access

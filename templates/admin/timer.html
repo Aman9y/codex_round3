@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Contest Timer Control</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .status { padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .status.active { background: #d4edda; border: 1px solid #c3e6cb; }
+        .status.inactive { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .controls { margin: 20px 0; }
+        .btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: black; }
+        .btn-danger { background: #dc3545; color: white; }
+        .timer-display { font-size: 24px; font-weight: bold; margin: 10px 0; }
+        .extend-form { margin: 10px 0; }
+        input[type="number"] { padding: 5px; width: 80px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Contest Timer Control</h1>
+        <p><a href="/">← Back to Dashboard</a></p>
+        
+        <div class="status {{ 'active' if status.started else 'inactive' }}">
+            <h3>Timer Status</h3>
+            {% if status.started %}
+                {% if status.finished %}
+                    <div class="timer-display" style="color: red;">Contest Ended</div>
+                {% else %}
+                    <div class="timer-display" id="timerDisplay">Loading...</div>
+                {% endif %}
+                <p>Started: {{ status.start_time }}</p>
+                <p>Duration: {{ status.duration_hours }}h {{ status.duration_minutes }}m</p>
+            {% else %}
+                <div class="timer-display">Contest Not Started</div>
+                <p>Duration: {{ status.duration_hours }}h {{ status.duration_minutes }}m</p>
+            {% endif %}
+        </div>
+        
+        <div class="controls">
+            <h3>Timer Controls</h3>
+            
+            {% if not status.started %}
+                <button class="btn btn-success" onclick="timerAction('start')">Start Contest</button>
+            {% endif %}
+            
+            <button class="btn btn-danger" onclick="timerAction('reset')">Reset Timer</button>
+            
+            <div class="extend-form">
+                <label>Extend by:</label>
+                <input type="number" id="extendMinutes" value="30" min="1" max="180">
+                <span>minutes</span>
+                <button class="btn btn-warning" onclick="extendTimer()">Extend</button>
+            </div>
+        </div>
+        
+        <div id="message" style="margin: 10px 0; padding: 10px; display: none;"></div>
+    </div>
+
+    <script>
+        function timerAction(action) {
+            if (action === 'reset' && !confirm('Are you sure you want to reset the timer? This will stop the contest.')) {
+                return;
+            }
+            
+            fetch('/timer/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: action })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('Timer action completed successfully', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showMessage('Error: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Network error: ' + error, 'error');
+            });
+        }
+        
+        function extendTimer() {
+            const minutes = document.getElementById('extendMinutes').value;
+            if (!minutes || minutes < 1) {
+                showMessage('Please enter a valid number of minutes', 'error');
+                return;
+            }
+            
+            fetch('/timer/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'extend', minutes: parseInt(minutes) })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(`Timer extended by ${minutes} minutes`, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showMessage('Error: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Network error: ' + error, 'error');
+            });
+        }
+        
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.style.display = 'block';
+            msg.style.background = type === 'success' ? '#d4edda' : '#f8d7da';
+            msg.style.border = type === 'success' ? '1px solid #c3e6cb' : '1px solid #f5c6cb';
+            msg.style.borderRadius = '4px';
+        }
+    </script>
+    
+    {% if status.started and not status.finished %}
+    <div id="timerData" data-start="{{ status.start_time }}" data-duration="{{ status.duration }}" style="display:none;"></div>
+    <script>
+        var timerData = document.getElementById('timerData');
+        var timerStartTime = parseInt(timerData.getAttribute('data-start'));
+        var timerDuration = parseInt(timerData.getAttribute('data-duration'));
+        
+        function updateTimer() {
+            var now = Math.floor(Date.now() / 1000);
+            var elapsed = now - timerStartTime;
+            var remaining = Math.max(0, timerDuration - elapsed);
+            
+            if (remaining === 0) {
+                document.getElementById('timerDisplay').textContent = 'Contest Ended';
+                document.getElementById('timerDisplay').style.color = 'red';
+                return;
+            }
+            
+            var hours = Math.floor(remaining / 3600);
+            var minutes = Math.floor((remaining % 3600) / 60);
+            var seconds = remaining % 60;
+            
+            var timeString = hours.toString().padStart(2, '0') + ':' + 
+                           minutes.toString().padStart(2, '0') + ':' + 
+                           seconds.toString().padStart(2, '0');
+            document.getElementById('timerDisplay').textContent = 'Time Remaining: ' + timeString;
+            
+            if (remaining <= 300) {
+                document.getElementById('timerDisplay').style.color = 'red';
+            } else if (remaining <= 900) {
+                document.getElementById('timerDisplay').style.color = 'orange';
+            } else {
+                document.getElementById('timerDisplay').style.color = 'green';
+            }
+        }
+        
+        updateTimer();
+        setInterval(updateTimer, 1000);
+    </script>
+    {% endif %}
+</body>
+</html>

@@ -8,15 +8,15 @@
     
     <div style="margin: 2rem 0;">
         <h3>» ALGORITHM SPECIFICATION:</h3>
-        <div style="background: #f8f9fa; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
-            {{ question.problem_statement | replace('\n', '<br>') | safe }}
+        <div style="background: #f8f9fa; padding: 1rem; border-radius: 4px; margin: 1rem 0; white-space: pre-wrap; line-height: 1.6; color: #333;">
+            {{ question.problem_statement }}
         </div>
     </div>
     
     {% if question.constraints %}
     <div style="margin: 1rem 0;">
         <h4>» SYSTEM CONSTRAINTS:</h4>
-        <p>{{ question.constraints }}</p>
+        <p style="white-space: pre-wrap; line-height: 1.6; color: #333;">{{ question.constraints }}</p>
     </div>
     {% endif %}
     
@@ -26,11 +26,11 @@
         <div style="display: flex; gap: 2rem;">
             <div style="flex: 1;">
                 <strong>INPUT:</strong>
-                <pre style="background: #f8f9fa; padding: 0.5rem; border-radius: 4px;">{{ question.sample_input }}</pre>
+                <pre style="background: #f8f9fa; padding: 0.5rem; border-radius: 4px; color: #333;">{{ question.sample_input }}</pre>
             </div>
             <div style="flex: 1;">
                 <strong>OUTPUT:</strong>
-                <pre style="background: #f8f9fa; padding: 0.5rem; border-radius: 4px;">{{ question.sample_output }}</pre>
+                <pre style="background: #f8f9fa; padding: 0.5rem; border-radius: 4px; color: #333;">{{ question.sample_output }}</pre>
             </div>
         </div>
     </div>
@@ -52,7 +52,17 @@
     <form id="codeForm" method="POST" action="{{ url_for('submit_code') }}">
         <input type="hidden" name="story_id" value="{{ story_id }}">
         <input type="hidden" id="languageInput" name="language" value="python">
-        <textarea id="codeEditor" name="code" class="code-editor" placeholder="# Write your code here..."></textarea>
+        
+        <div class="editor-container">
+            <div class="editor-header">
+                <div>📄 <span id="fileName">main.py</span></div>
+                <div style="font-size: 11px; color: #858585;">Python • UTF-8</div>
+            </div>
+            <div class="editor-wrapper">
+                <div class="line-numbers" id="lineNumbers">1</div>
+                <textarea id="codeEditor" name="code" class="code-editor code-editor-with-numbers" placeholder="# Write your code here..."></textarea>
+            </div>
+        </div>
         
         <div style="margin: 1rem 0;">
             <button type="button" id="runBtn" class="btn">Run Code</button>
@@ -91,24 +101,98 @@ int main() {
 }`
 };
 
+// Update line numbers
+function updateLineNumbers() {
+    const editor = document.getElementById('codeEditor');
+    const lineNumbers = document.getElementById('lineNumbers');
+    const lineCount = editor.value.split('\n').length;
+    
+    let numbers = [];
+    for (let i = 1; i <= lineCount; i++) {
+        numbers.push(i);
+    }
+    
+    lineNumbers.innerHTML = numbers.join('<br>');
+    
+    // Auto-resize textarea
+    editor.style.height = 'auto';
+    editor.style.height = Math.max(200, editor.scrollHeight) + 'px';
+}
+
 // Handle language selection
 document.getElementById('languageSelect').addEventListener('change', function() {
     const language = this.value;
     const codeEditor = document.getElementById('codeEditor');
     const languageInput = document.getElementById('languageInput');
+    const fileName = document.getElementById('fileName');
+    const headerInfo = document.querySelector('.editor-header div:last-child');
     
     // Update hidden input
     languageInput.value = language;
     
-    // Update template only if editor is empty
+    // Update filename and header info
+    if (language === 'python') {
+        fileName.textContent = 'main.py';
+        headerInfo.textContent = 'Python • UTF-8';
+        codeEditor.placeholder = 'Write your Python code here...';
+    } else {
+        fileName.textContent = 'main.c';
+        headerInfo.textContent = 'C • UTF-8';
+        codeEditor.placeholder = 'Write your C code here...';
+    }
+    
+    // Only load template if editor is empty
     if (codeEditor.value.trim() === '') {
         codeEditor.value = codeTemplates[language];
-        codeEditor.placeholder = `Write your ${language.toUpperCase()} code here...`;
+        updateLineNumbers();
     }
 });
 
 // Initialize with Python template
 document.getElementById('codeEditor').value = codeTemplates.python;
+updateLineNumbers();
+
+// Add Tab key support and line number updates
+document.getElementById('codeEditor').addEventListener('input', updateLineNumbers);
+document.getElementById('codeEditor').addEventListener('keydown', function(e) {
+    const language = document.getElementById('languageSelect').value;
+    
+    if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+        
+        this.value = this.value.substring(0, start) + '    ' + this.value.substring(end);
+        this.selectionStart = this.selectionEnd = start + 4;
+        updateLineNumbers();
+    }
+    
+    // Auto-indentation for Python
+    if (e.key === 'Enter' && language === 'python') {
+        e.preventDefault();
+        
+        const start = this.selectionStart;
+        const lines = this.value.substring(0, start).split('\n');
+        const currentLine = lines[lines.length - 1];
+        
+        // Calculate current indentation
+        const indentMatch = currentLine.match(/^(\s*)/);
+        let currentIndent = indentMatch ? indentMatch[1] : '';
+        
+        // Check if current line ends with colon (for if, for, while, def, class, etc.)
+        const needsExtraIndent = currentLine.trim().endsWith(':');
+        
+        // Add extra indentation after colon
+        const newIndent = needsExtraIndent ? currentIndent + '    ' : currentIndent;
+        
+        // Insert newline with proper indentation
+        const newText = '\n' + newIndent;
+        this.value = this.value.substring(0, start) + newText + this.value.substring(start);
+        this.selectionStart = this.selectionEnd = start + newText.length;
+        
+        updateLineNumbers();
+    }
+});
 
 document.getElementById('runBtn').addEventListener('click', function() {
     const code = document.getElementById('codeEditor').value;

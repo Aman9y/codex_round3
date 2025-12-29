@@ -182,21 +182,69 @@
         .table tr:hover { 
             background: rgba(255, 255, 255, 0.05);
         }
-        .code-editor { 
-            width: 100%; 
-            height: 400px; 
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace; 
-            font-size: 14px; 
-            border: 1px solid #3e3e42; 
+        .code-editor {
+            width: 100%;
+            min-height: 200px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            border: 1px solid #3e3e42;
             padding: 15px;
             background: #1e1e1e;
-            color: #e0e0e0;
+            color: #d4d4d4;
             border-radius: 4px;
             resize: vertical;
+            line-height: 21px;
+            tab-size: 4;
+            overflow: hidden;
         }
         .code-editor:focus {
             outline: none;
             border-color: #007acc;
+            box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
+        }
+        .editor-container {
+            position: relative;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            background: #1e1e1e;
+            overflow: hidden;
+        }
+        .editor-header {
+            background: #2d2d30;
+            padding: 8px 15px;
+            border-bottom: 1px solid #3e3e42;
+            font-size: 12px;
+            color: #cccccc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .editor-wrapper {
+            position: relative;
+        }
+        .line-numbers {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 40px;
+            background: #252526;
+            color: #858585;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 21px;
+            padding: 15px 5px;
+            border-right: 1px solid #3e3e42;
+            user-select: none;
+            text-align: right;
+            pointer-events: none;
+            height: 100%;
+            overflow: hidden;
+        }
+        .code-editor-with-numbers {
+            padding-left: 50px;
+            border: none;
+            border-radius: 0;
+            line-height: 21px;
         }
         .output-box { 
             background: #1e1e1e; 
@@ -231,6 +279,30 @@
             color: #e0e0e0 !important;
             border: 1px solid #3e3e42 !important;
         }
+        
+        /* Contest timer styles */
+        .contest-timer {
+            display: inline-block;
+            background: #007acc;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+            margin: 0 1rem;
+        }
+        
+        .timer-warning {
+            background: #ffc107 !important;
+            color: #212529 !important;
+            animation: pulse 1s infinite;
+        }
+        
+        .timer-critical {
+            background: #dc3545 !important;
+            color: white !important;
+            animation: pulse 0.5s infinite;
+        }
     </style>
 </head>
 <body>
@@ -240,6 +312,7 @@
             {% if session.team_id %}
             <div class="nav">
                 <span>Welcome, <strong>{{ session.username }}</strong></span>
+                <div id="contestTimer" class="contest-timer">Loading...</div>
                 <a href="{{ url_for('story') }}">Stories</a>
                 <a href="{{ url_for('leaderboard') }}">Leaderboard</a>
                 <a href="{{ url_for('logout') }}">Logout</a>
@@ -430,6 +503,53 @@
         }
         
         console.log('Anti-cheat protection activated');
+        
+        // Contest timer functionality
+        function updateTimer() {
+            fetch('/api/timer')
+                .then(response => response.json())
+                .then(data => {
+                    const timerElement = document.getElementById('contestTimer');
+                    if (!timerElement) return;
+                    
+                    if (!data.started) {
+                        timerElement.textContent = 'Contest not started';
+                        timerElement.className = 'contest-timer';
+                        return;
+                    }
+                    
+                    if (data.finished) {
+                        timerElement.textContent = 'Contest Ended';
+                        timerElement.className = 'contest-timer timer-critical';
+                        return;
+                    }
+                    
+                    const hours = Math.floor(data.remaining / 3600);
+                    const minutes = Math.floor((data.remaining % 3600) / 60);
+                    const seconds = Math.floor(data.remaining % 60);
+                    
+                    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    timerElement.textContent = `Time: ${timeString}`;
+                    
+                    // Change color based on remaining time
+                    if (data.remaining <= 300) { // 5 minutes
+                        timerElement.className = 'contest-timer timer-critical';
+                    } else if (data.remaining <= 900) { // 15 minutes
+                        timerElement.className = 'contest-timer timer-warning';
+                    } else {
+                        timerElement.className = 'contest-timer';
+                    }
+                })
+                .catch(error => {
+                    console.error('Timer update failed:', error);
+                });
+        }
+        
+        // Update timer every second if timer element exists
+        if (document.getElementById('contestTimer')) {
+            updateTimer();
+            setInterval(updateTimer, 1000);
+        }
         
     })();
     </script>

@@ -18,6 +18,10 @@ app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
 DATABASE = 'database/contest.db'
 
+# Contest timer settings (in minutes)
+CONTEST_DURATION = 120  # 2 hours
+CONTEST_START_TIME = None  # Will be set when first user logs in
+
 # Security settings
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to True if using HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -41,6 +45,17 @@ def init_anticheat_database():
     """Initialize anti-cheat related database tables"""
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS contest_config (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    ''')
+    
+    # Initialize default timer config
+    cursor.execute('INSERT OR IGNORE INTO contest_config (key, value) VALUES ("contest_start_time", "0")')
+    cursor.execute('INSERT OR IGNORE INTO contest_config (key, value) VALUES ("contest_duration", "0")')
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS tab_switches (
@@ -70,6 +85,28 @@ def init_db():
         conn.executescript(f.read())
     conn.close()
 
+def get_real_ip():
+    """Get real client IP address, handling proxies and port forwarding"""
+    # Check for forwarded IP headers first
+    forwarded_ips = [
+        request.headers.get('X-Forwarded-For'),
+        request.headers.get('X-Real-IP'),
+        request.headers.get('CF-Connecting-IP'),
+        request.headers.get('X-Forwarded'),
+        request.headers.get('Forwarded-For'),
+        request.headers.get('Forwarded')
+    ]
+    
+    for ip_header in forwarded_ips:
+        if ip_header:
+            # Handle comma-separated IPs (X-Forwarded-For can have multiple)
+            ip = ip_header.split(',')[0].strip()
+            if ip and ip != '127.0.0.1' and ip != 'localhost':
+                return ip
+    
+    # Fallback to remote_addr
+    return request.environ.get('REMOTE_ADDR', 'unknown')
+
 def get_db():
     """Get database connection with high-performance optimizations"""
     conn = sqlite3.connect(DATABASE, timeout=30.0)
@@ -87,9 +124,7 @@ def rate_limit(max_requests=10, window=60):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
-            if ',' in client_ip:
-                client_ip = client_ip.split(',')[0].strip()
+            client_ip = get_real_ip()
             
             now = datetime.now()
             key = f"{client_ip}:{f.__name__}"
@@ -108,6 +143,24 @@ def rate_limit(max_requests=10, window=60):
             return f(*args, **kwargs)
         return decorated_function
     return decorator
+
+def contest_started_required(f):
+    """Decorator to check if contest has started"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        conn = get_db()
+        try:
+            config = conn.execute('SELECT value FROM contest_config WHERE key = "contest_start_time"').fetchone()
+            start_time = int(config['value']) if config else 0
+        except:
+            start_time = 0
+        finally:
+            conn.close()
+        
+        if start_time == 0:
+            return render_template('contest_not_started.html')
+        return f(*args, **kwargs)
+    return decorated_function
 
 def login_required(f):
     """Decorator to require login"""
@@ -146,7 +199,7 @@ def login():
             # Update IP address and last login
             conn.execute(
                 'UPDATE teams SET ip_address = ?, last_login = datetime("now", "localtime") WHERE team_id = ?',
-                (request.remote_addr, team['team_id'])
+                (get_real_ip(), team['team_id'])
             )
             conn.commit()
             conn.close()
@@ -170,6 +223,7 @@ def logout():
 @app.route('/story')
 @app.route('/story/<int:story_id>')
 @login_required
+@contest_started_required
 def story(story_id=None):
     conn = get_db()
     
@@ -238,6 +292,7 @@ def story(story_id=None):
 
 @app.route('/solve_story', methods=['POST'])
 @login_required
+@contest_started_required
 def solve_story():
     answer = request.form.get('answer', '').strip().lower()
     story_id = request.form.get('story_id')
@@ -299,6 +354,7 @@ def solve_story():
 
 @app.route('/use_hint', methods=['POST'])
 @login_required
+@contest_started_required
 def use_hint():
     story_id = request.form['story_id']
     hint_number = request.form['hint_number']
@@ -324,6 +380,7 @@ def use_hint():
 
 @app.route('/coding/<int:story_id>')
 @login_required
+@contest_started_required
 def coding(story_id):
     conn = get_db()
     
@@ -403,6 +460,7 @@ def coding(story_id):
 
 @app.route('/run_code', methods=['POST'])
 @login_required
+@contest_started_required
 @rate_limit(max_requests=20, window=60)  # 20 code runs per minute
 def run_code():
     data = request.get_json()
@@ -430,6 +488,7 @@ def run_code():
 
 @app.route('/submit_code', methods=['POST'])
 @login_required
+@contest_started_required
 @rate_limit(max_requests=3, window=300)  # 3 submissions per 5 minutes
 def submit_code():
     code = request.form.get('code', '').strip()
@@ -512,7 +571,7 @@ def submit_code():
         (team_id, story_id, code, language, test_results, score, passed_tests, total_tests, ip_address)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (session['team_id'], story_id, code, language, json.dumps(results), 
-          final_score, passed, len(test_cases), request.remote_addr))
+          final_score, passed, len(test_cases), get_real_ip()))
     
     # Mark as submitted
     conn.execute('''
@@ -584,6 +643,47 @@ def api_leaderboard():
     
     return jsonify([dict(team) for team in teams])
 
+@app.route('/api/timer')
+def get_timer():
+    """Get contest timer information from database"""
+    conn = get_db()
+    
+    try:
+        # Get timer config from database
+        config = conn.execute('SELECT key, value FROM contest_config WHERE key IN ("contest_start_time", "contest_duration")').fetchall()
+        config_dict = {row['key']: int(row['value']) for row in config}
+    except:
+        # Initialize default config if not exists
+        conn.execute('INSERT OR IGNORE INTO contest_config (key, value) VALUES ("contest_start_time", "0")')
+        conn.execute('INSERT OR IGNORE INTO contest_config (key, value) VALUES ("contest_duration", "0")')
+        conn.commit()
+        config_dict = {'contest_start_time': 0, 'contest_duration': 0}
+    
+    start_time = config_dict.get('contest_start_time', 0)
+    duration = config_dict.get('contest_duration', 0)
+    
+    conn.close()
+    
+    if start_time == 0:
+        return jsonify({
+            'started': False,
+            'duration': duration,
+            'remaining': duration,
+            'message': 'Contest not started by admin'
+        })
+    
+    elapsed = int(time.time()) - start_time
+    remaining = max(0, duration - elapsed)
+    
+    return jsonify({
+        'started': True,
+        'duration': duration,
+        'remaining': remaining,
+        'elapsed': elapsed,
+        'start_time': start_time,
+        'finished': remaining <= 0
+    })
+
 # Anti-cheat routes
 @app.route('/tab-switch', methods=['POST'])
 @login_required
@@ -596,9 +696,7 @@ def log_tab_switch():
         data = request.get_json()
         team_id = session.get('team_id')
         count = data.get('count', 0)
-        user_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.environ.get('REMOTE_ADDR', 'unknown'))
-        if ',' in user_ip:
-            user_ip = user_ip.split(',')[0].strip()
+        user_ip = get_real_ip()
         
         # Log to console for admin monitoring
         print(f"TAB SWITCH ALERT: {team_id} from {user_ip} - Count: {count} at {datetime.now().isoformat()}")
@@ -825,4 +923,4 @@ if __name__ == '__main__':
     init_anticheat_database()
     
     # Run with optimized settings for 30+ teams
-    app.run(host='0.0.0.0', port=5000, debug=False, threaded=True, processes=1)
+    app.run(host='0.0.0.0', port=8080, debug=False, threaded=True, processes=1)

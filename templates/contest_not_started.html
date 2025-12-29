@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contest Not Started</title>
+    <style>
+        body {
+            font-family: 'Fira Code', 'Courier New', monospace;
+            background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+            color: #c9d1d9;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            text-align: center;
+            background: #21262d;
+            padding: 3rem;
+            border-radius: 12px;
+            border: 1px solid #30363d;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .icon {
+            font-size: 4rem;
+            color: #f85149;
+            margin-bottom: 1rem;
+        }
+        
+        h1 {
+            color: #f0f6fc;
+            margin-bottom: 1rem;
+            font-size: 2rem;
+        }
+        
+        .message {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+            color: #8b949e;
+        }
+        
+        .timer-display {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 1rem;
+            margin: 1rem 0;
+            font-size: 1.2rem;
+            color: #ffa657;
+        }
+        
+        .logout-btn {
+            background: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        
+        .logout-btn:hover {
+            background: #30363d;
+            border-color: #8b949e;
+        }
+        
+        .refresh-note {
+            font-size: 0.9rem;
+            color: #6e7681;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">⏳</div>
+        <h1>Contest Not Started</h1>
+        <div class="message">
+            The contest has not been started by the administrator yet.<br>
+            Please wait for the contest to begin.
+        </div>
+        
+        <div class="timer-display" id="contestTimer">
+            Waiting for admin to start contest...
+        </div>
+        
+        <div class="refresh-note">
+            This page will automatically refresh when the contest starts.
+        </div>
+        
+        <div style="margin-top: 2rem;">
+            <a href="/logout" class="logout-btn">Logout</a>
+        </div>
+    </div>
+
+    <script>
+        // Check contest status every 5 seconds
+        function checkContestStatus() {
+            fetch('/api/timer')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.started) {
+                        // Contest started, redirect to story page
+                        window.location.href = '/story';
+                    } else {
+                        document.getElementById('contestTimer').textContent = 
+                            data.message || 'Waiting for admin to start contest...';
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to check contest status:', error);
+                });
+        }
+        
+        // Check immediately and then every 5 seconds
+        checkContestStatus();
+        setInterval(checkContestStatus, 5000);
+    </script>
+</body>
+</html>
