@@ -4,6 +4,7 @@ CREATE TABLE teams (
     team_id TEXT UNIQUE NOT NULL,
     username TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
+    plain_password TEXT,
     ip_address TEXT,
     last_login TIMESTAMP,
     created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))

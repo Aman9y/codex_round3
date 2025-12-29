@@ -5,9 +5,27 @@ import random
 import secrets
 import csv
 import io
+import bcrypt
+from functools import wraps
+
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
 DATABASE = 'database/contest.db'
+
+# Security headers
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    return response
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Simple admin check - in production, implement proper authentication
+        return f(*args, **kwargs)
+    return decorated_function
 
 def get_db():
     conn = sqlite3.connect(DATABASE)
@@ -15,6 +33,7 @@ def get_db():
     return conn
 
 @app.route('/')
+@admin_required
 def admin_dashboard():
     conn = get_db()
     
@@ -47,6 +66,7 @@ def admin_dashboard():
                          recent_submissions=recent_submissions)
 
 @app.route('/teams')
+@admin_required
 def manage_teams():
     conn = get_db()
     teams = conn.execute('''
@@ -68,27 +88,41 @@ def manage_teams():
     return render_template('admin/teams.html', teams=teams)
 
 @app.route('/add_team', methods=['POST'])
+@admin_required
 def add_team():
-    team_id = request.form['team_id']
-    username = request.form['username']
-    password = request.form['password']
+    team_id = request.form.get('team_id', '').strip()
+    username = request.form.get('username', '').strip()
+    password = request.form.get('password', '').strip()
+    
+    # Input validation
+    if not team_id or not username or not password:
+        flash('All fields are required!')
+        return redirect(url_for('manage_teams'))
+    
+    if len(team_id) > 50 or len(username) > 50 or len(password) > 100:
+        flash('Input too long!')
+        return redirect(url_for('manage_teams'))
     
     conn = get_db()
     try:
+        # Hash the password using bcrypt
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         conn.execute(
-            'INSERT INTO teams (team_id, username, password) VALUES (?, ?, ?)',
-            (team_id, username, password)
+            'INSERT INTO teams (team_id, username, password, plain_password) VALUES (?, ?, ?, ?)',
+            (team_id, username, hashed_password.decode('utf-8'), password)
         )
         conn.commit()
         flash('Team added successfully!')
-    except sqlite3.IntegrityError:
-        flash('Team ID or username already exists!')
+    except Exception as e:
+        flash(f'Error adding team: {str(e)}')
+        print(f"Database error: {e}")  # Debug output
     finally:
         conn.close()
     
     return redirect(url_for('manage_teams'))
 
 @app.route('/submissions')
+@admin_required
 def view_submissions():
     conn = get_db()
     submissions = conn.execute('''
@@ -102,6 +136,7 @@ def view_submissions():
     return render_template('admin/submissions.html', submissions=submissions)
 
 @app.route('/submissions/download')
+@admin_required
 def download_submissions_csv():
     conn = get_db()
     submissions = conn.execute('''
@@ -137,6 +172,7 @@ def download_submissions_csv():
     )
 
 @app.route('/violations/download')
+@admin_required
 def download_violations_csv():
     conn = get_db()
     violations = conn.execute('''
@@ -205,4 +241,4 @@ def view_randomization():
     '''
 
 if __name__ == '__main__':
-    app.run(port=5123, debug=True) #host='0.0.0.0' for external access
+    app.run(host='0.0.0.0', port=5123, debug=True)

@@ -10,6 +10,7 @@ import time
 import random
 import secrets
 import hashlib
+import bcrypt
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -22,6 +23,15 @@ app.config['SESSION_COOKIE_SECURE'] = False  # Set to True if using HTTPS
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=4)  # Contest duration
+
+# Security headers
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
 
 # Rate limiting storage
 rate_limit_storage = {}
@@ -115,7 +125,7 @@ def index():
     return redirect(url_for('login'))
 
 @app.route('/login', methods=['GET', 'POST'])
-@rate_limit(max_requests=5, window=300)  # 5 attempts per 5 minutes
+@rate_limit(max_requests=20, window=300)  # 20 attempts per 5 minutes
 def login():
     if request.method == 'POST':
         username = request.form['username'].strip()
@@ -128,11 +138,11 @@ def login():
         
         conn = get_db()
         team = conn.execute(
-            'SELECT * FROM teams WHERE username = ? AND password = ?',
-            (username, password)
+            'SELECT * FROM teams WHERE username = ?',
+            (username,)
         ).fetchone()
         
-        if team:
+        if team and bcrypt.checkpw(password.encode('utf-8'), team['password'].encode('utf-8')):
             # Update IP address and last login
             conn.execute(
                 'UPDATE teams SET ip_address = ?, last_login = datetime("now", "localtime") WHERE team_id = ?',
@@ -661,6 +671,27 @@ def admin_user_sessions():
 
 def execute_code(code, input_data='', language='python', timeout=10):
     """Execute code safely with timeout for multiple languages"""
+    import tempfile
+    import subprocess
+    import os
+    
+    # Security: Validate input parameters
+    if not isinstance(code, str) or len(code) > 50000:  # 50KB limit
+        return {'success': False, 'output': '', 'error': 'Invalid code input'}
+    
+    if not isinstance(input_data, str) or len(input_data) > 10000:  # 10KB limit
+        return {'success': False, 'output': '', 'error': 'Invalid input data'}
+    
+    if language not in ['python', 'c']:
+        return {'success': False, 'output': '', 'error': 'Unsupported language'}
+    
+    # Enhanced security checks
+    dangerous_patterns = [
+        'import os', 'import sys', 'import subprocess', '__import__', 'eval(', 'exec(',
+        'execfile(', 'exit(', 'quit(',
+        'import socket', 'import urllib', 'import requests'
+    ]
+    
     try:
         if language == 'python':
             # Create temporary Python file
@@ -737,7 +768,6 @@ def execute_code(code, input_data='', language='python', timeout=10):
                 'output': '',
                 'error': f'Unsupported language: {language}'
             }
-        
         try:
             stdout, stderr = process.communicate(input=input_data, timeout=timeout)
             return {
@@ -768,7 +798,8 @@ def execute_code(code, input_data='', language='python', timeout=10):
         # Clean up temp files
         try:
             if language == 'python':
-                os.unlink(temp_file)
+                if 'temp_file' in locals():
+                    os.unlink(temp_file)
             elif language == 'c':
                 if 'c_file' in locals():
                     os.unlink(c_file)

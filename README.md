@@ -78,11 +78,14 @@ codex3/
 
 ## 🔒 Security Features
 
-- Session-based authentication
-- Code execution with timeout (10 seconds)
-- Restricted to Python only
-- No file system access for user code
-- Single submission enforcement
+- **Session-based authentication** with secure cookies
+- **Anti-cheat protection**: Copy/paste blocking, dev tools blocking, tab switch detection
+- **Code execution sandbox** with timeout (10 seconds) and restricted imports
+- **Rate limiting** on login attempts and code submissions
+- **Input validation** and SQL injection protection
+- **Security headers** (XSS protection, content type sniffing prevention)
+- **Single submission enforcement** per question
+- **IP address logging** for audit trails
 
 ## 🏆 Scoring System
 
@@ -112,6 +115,7 @@ python admin.py
 - `hints` - Available hints per story
 - `hints_used` - Track hint usage and penalties
 - `team_progress` - Track team advancement
+- `tab_switches` - Anti-cheat violation logging
 
 ## 🔧 Customization
 

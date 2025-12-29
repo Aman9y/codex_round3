@@ -1,5 +1,6 @@
 import sqlite3
 import json
+import bcrypt
 
 def setup_database():
     """Initialize database with sample data"""
@@ -9,19 +10,21 @@ def setup_database():
     with open('database/schema.sql', 'r') as f:
         conn.executescript(f.read())
     
-    # Sample teams
+    # Sample teams with simple passwords (will be hashed)
     teams = [
-        ('team01', 'alpha', 'pass123'),
-        ('team02', 'beta', 'pass123'),
-        ('team03', 'gamma', 'pass123'),
-        ('team04', 'delta', 'pass123'),
-        ('team05', 'epsilon', 'pass123'),
+        ('team01', 'alpha', 'alpha123'),
+        ('team02', 'beta', 'beta123'),
+        ('team03', 'gamma', 'gamma123'),
+        ('team04', 'delta', 'delta123'),
+        ('team05', 'epsilon', 'epsilon123'),
     ]
     
     for team_id, username, password in teams:
+        # Hash the password using bcrypt
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         conn.execute(
-            'INSERT OR IGNORE INTO teams (team_id, username, password) VALUES (?, ?, ?)',
-            (team_id, username, password)
+            'INSERT OR IGNORE INTO teams (team_id, username, password, plain_password) VALUES (?, ?, ?, ?)',
+            (team_id, username, hashed_password.decode('utf-8'), password)
         )
     
     # Multiple stories

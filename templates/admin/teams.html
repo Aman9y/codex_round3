@@ -75,7 +75,7 @@
                     <tr>
                         <td>{{ team.team_id }}</td>
                         <td>{{ team.username }}</td>
-                        <td>{{ team.password }}</td>
+                        <td>{{ team.plain_password or team.password }}</td>
                         <td>{{ team.ip_address or 'Not logged in' }}</td>
                         <td>{{ team.last_login or 'Never' }}</td>
                         <td>{{ team.submission_count }}</td>
