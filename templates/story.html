@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}MISSION BRIEFING{% endblock %}
+
+{% block content %}
+<!-- Story Navigation -->
+<div class="card">
+    <h3>» AVAILABLE MISSIONS «</h3>
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0;">
+        {% for s in all_stories %}
+            <a href="{{ url_for('story', story_id=s.id) }}" 
+               class="btn {% if s.id == current_story_id %}btn-success{% else %}btn{% endif %}" 
+               style="text-decoration: none;">
+                [{{ loop.index }}] {{ s.title[:20] }}...
+            </a>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="card">
+    <h2>{{ story.title }}</h2>
+    
+    <div style="margin: 2rem 0;">
+        <h3>» MISSION BRIEFING:</h3>
+        <p style="font-size: 1.1em; line-height: 1.8; margin: 1rem 0;">{{ story.story_text }}</p>
+    </div>
+    
+    <div style="margin: 2rem 0;">
+        <h3>» SECURITY CHALLENGE:</h3>
+        <p style="font-size: 1.1em; font-weight: bold; color: #00ff41;">{{ story.riddle_question }}</p>
+    </div>
+    
+    {% if not progress or not progress.story_solved %}
+        <!-- Hints Section -->
+        {% if hints %}
+        <div style="margin: 2rem 0;">
+            <h3>» INTEL AVAILABLE:</h3>
+            {% for hint in hints %}
+                {% if hint.hint_number in used_hints %}
+                    <div class="hint-box">
+                        <strong>[INTEL {{ hint.hint_number }}]:</strong> {{ hint.hint_text }}
+                        <span class="score-badge" style="background: #dc3545;">-10 PTS</span>
+                    </div>
+                {% else %}
+                    <form method="POST" action="{{ url_for('use_hint') }}" style="display: inline;">
+                        <input type="hidden" name="story_id" value="{{ story.id }}">
+                        <input type="hidden" name="hint_number" value="{{ hint.hint_number }}">
+                        <button type="submit" class="btn btn-warning" style="margin: 0.5rem 0;">
+                            [DECRYPT INTEL {{ hint.hint_number }}] (-10 PTS)
+                        </button>
+                    </form>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <!-- Answer Form -->
+        <form method="POST" action="{{ url_for('solve_story') }}">
+            <input type="hidden" name="story_id" value="{{ story.id }}">
+            <div class="form-group">
+                <label for="answer">» ENTER ACCESS CODE:</label>
+                <input type="text" id="answer" name="answer" placeholder="[CLASSIFIED]" required>
+            </div>
+            <button type="submit" class="btn btn-success">» AUTHENTICATE «</button>
+        </form>
+    {% else %}
+        <div class="alert alert-success">
+            <strong>» ACCESS GRANTED «</strong> Security challenge bypassed! 
+            <a href="{{ url_for('coding', story_id=story.id) }}" class="btn btn-success" style="margin-left: 1rem;">
+                » ENTER CODING MATRIX «
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

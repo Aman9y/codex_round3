@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Leaderboard{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Live Leaderboard</h2>
+    <p style="text-align: center; color: #666; margin-bottom: 2rem;">
+        Updates automatically every 10 seconds
+    </p>
+    
+    <table class="table" id="leaderboardTable">
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>Team</th>
+                <th>Total Score</th>
+                <th>Submissions</th>
+                <th>Hints Used</th>
+                <th>Last Submission</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for team in teams %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ team.username }}</td>
+                <td>
+                    {% if team.final_score > 0 %}
+                        <span class="score-badge">{{ team.final_score }}</span>
+                    {% else %}
+                        <span style="color: #666;">Not submitted</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if team.submissions_count > 0 %}
+                        {{ team.submissions_count }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ team.hints_used or 0 }}</td>
+                <td>
+                    {% if team.last_submission %}
+                        {{ team.last_submission }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    {% if not teams %}
+    <p style="text-align: center; color: #666; margin: 2rem 0;">
+        No submissions yet. Be the first to solve the challenge!
+    </p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateLeaderboard() {
+    fetch('/api/leaderboard')
+        .then(response => response.json())
+        .then(data => {
+            const tbody = document.querySelector('#leaderboardTable tbody');
+            tbody.innerHTML = '';
+            
+            data.forEach((team, index) => {
+                const row = document.createElement('tr');
+                
+                const scoreDisplay = team.final_score > 0 
+                    ? `<span class="score-badge">${team.final_score}</span>`
+                    : '<span style="color: #666;">Not submitted</span>';
+                
+                const testsDisplay = team.submissions_count 
+                    ? `${team.submissions_count}`
+                    : '-';
+                
+                const timeDisplay = team.last_submission || '-';
+                
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${team.username}</td>
+                    <td>${scoreDisplay}</td>
+                    <td>${testsDisplay}</td>
+                    <td>${team.hints_used || 0}</td>
+                    <td>${timeDisplay}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error('Error updating leaderboard:', error);
+        });
+}
+
+// Update every 10 seconds
+setInterval(updateLeaderboard, 10000);
+</script>
+{% endblock %}

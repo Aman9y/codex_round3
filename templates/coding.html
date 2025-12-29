@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Coding Challenge{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>{{ question.title }}</h2>
+    
+    <div style="margin: 2rem 0;">
+        <h3>» ALGORITHM SPECIFICATION:</h3>
+        <div style="background: #f8f9fa; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+            {{ question.problem_statement | replace('\n', '<br>') | safe }}
+        </div>
+    </div>
+    
+    {% if question.constraints %}
+    <div style="margin: 1rem 0;">
+        <h4>» SYSTEM CONSTRAINTS:</h4>
+        <p>{{ question.constraints }}</p>
+    </div>
+    {% endif %}
+    
+    {% if question.sample_input and question.sample_output %}
+    <div style="margin: 1rem 0;">
+        <h4>» TEST VECTORS:</h4>
+        <div style="display: flex; gap: 2rem;">
+            <div style="flex: 1;">
+                <strong>INPUT:</strong>
+                <pre style="background: #f8f9fa; padding: 0.5rem; border-radius: 4px;">{{ question.sample_input }}</pre>
+            </div>
+            <div style="flex: 1;">
+                <strong>OUTPUT:</strong>
+                <pre style="background: #f8f9fa; padding: 0.5rem; border-radius: 4px;">{{ question.sample_output }}</pre>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h3>Code Editor</h3>
+    
+    <!-- Language Selection -->
+    <div style="margin-bottom: 1rem;">
+        <label for="languageSelect">Language:</label>
+        <select id="languageSelect" style="padding: 8px; margin-left: 10px; border: 1px solid #ddd; border-radius: 4px;">
+            <option value="python">Python</option>
+            <option value="c">C</option>
+        </select>
+    </div>
+    
+    <form id="codeForm" method="POST" action="{{ url_for('submit_code') }}">
+        <input type="hidden" name="story_id" value="{{ story_id }}">
+        <input type="hidden" id="languageInput" name="language" value="python">
+        <textarea id="codeEditor" name="code" class="code-editor" placeholder="# Write your code here..."></textarea>
+        
+        <div style="margin: 1rem 0;">
+            <button type="button" id="runBtn" class="btn">Run Code</button>
+            <button type="submit" id="submitBtn" class="btn btn-success" style="margin-left: 1rem;">
+                Submit Solution (Only One Submission!)
+            </button>
+        </div>
+    </form>
+    
+    <div style="margin-top: 1rem;">
+        <h4>Test Input:</h4>
+        <textarea id="testInput" placeholder="Enter test input here..." style="width: 100%; height: 100px; font-family: monospace;"></textarea>
+    </div>
+    
+    <div id="output" class="output-box" style="display: none;">
+        <h4>Output:</h4>
+        <div id="outputContent"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Language templates
+const codeTemplates = {
+    python: `# Write your Python code here
+n = int(input())
+print(n)`,
+    c: `#include <stdio.h>
+
+int main() {
+    int n;
+    scanf("%d", &n);
+    printf("%d\\n", n);
+    return 0;
+}`
+};
+
+// Handle language selection
+document.getElementById('languageSelect').addEventListener('change', function() {
+    const language = this.value;
+    const codeEditor = document.getElementById('codeEditor');
+    const languageInput = document.getElementById('languageInput');
+    
+    // Update hidden input
+    languageInput.value = language;
+    
+    // Update template only if editor is empty
+    if (codeEditor.value.trim() === '') {
+        codeEditor.value = codeTemplates[language];
+        codeEditor.placeholder = `Write your ${language.toUpperCase()} code here...`;
+    }
+});
+
+// Initialize with Python template
+document.getElementById('codeEditor').value = codeTemplates.python;
+
+document.getElementById('runBtn').addEventListener('click', function() {
+    const code = document.getElementById('codeEditor').value;
+    const language = document.getElementById('languageSelect').value;
+    const input = document.getElementById('testInput').value;
+    
+    if (!code.trim()) {
+        alert('Please write some code first!');
+        return;
+    }
+    
+    this.disabled = true;
+    this.textContent = 'Running...';
+    
+    fetch('/run_code', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            code: code,
+            language: language,
+            input: input
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        const outputDiv = document.getElementById('output');
+        const outputContent = document.getElementById('outputContent');
+        
+        if (data.success) {
+            outputContent.innerHTML = '<strong>Success:</strong><br>' + 
+                                    (data.output || '(no output)');
+            outputContent.style.color = 'green';
+        } else {
+            outputContent.innerHTML = '<strong>Error:</strong><br>' + 
+                                    (data.error || 'Unknown error');
+            outputContent.style.color = 'red';
+        }
+        
+        outputDiv.style.display = 'block';
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error running code');
+    })
+    .finally(() => {
+        this.disabled = false;
+        this.textContent = 'Run Code';
+    });
+});
+
+document.getElementById('submitBtn').addEventListener('click', function(e) {
+    const code = document.getElementById('codeEditor').value;
+    
+    if (!code.trim()) {
+        e.preventDefault();
+        alert('Please write some code first!');
+        return;
+    }
+    
+    if (!confirm('Are you sure you want to submit? You can only submit ONCE!')) {
+        e.preventDefault();
+        return;
+    }
+});
+</script>
+{% endblock %}

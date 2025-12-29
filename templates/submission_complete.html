@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Submission Complete{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Submission Complete!</h2>
+    
+    <div class="alert alert-success">
+        <strong>Your code has been submitted and evaluated!</strong>
+    </div>
+    
+    <div style="margin: 2rem 0;">
+        <h3>Results:</h3>
+        <p><strong>Score:</strong> <span class="score-badge">{{ submission.score }} points</span></p>
+        <p><strong>Tests Passed:</strong> {{ submission.passed_tests }} / {{ submission.total_tests }}</p>
+        <p><strong>Submitted At:</strong> {{ submission.submitted_at }}</p>
+    </div>
+    
+    <div style="margin: 2rem 0;">
+        <h3>Your Code ({{ submission.language.upper() }}):</h3>
+        <pre style="background: #f8f9fa; padding: 1rem; border-radius: 4px; overflow-x: auto;">{{ submission.code }}</pre>
+    </div>
+    
+    {% if submission.test_results %}
+    <div style="margin: 2rem 0;">
+        <h3>Test Results:</h3>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Test Case</th>
+                    <th>Input</th>
+                    <th>Expected</th>
+                    <th>Your Output</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for result in submission.test_results | from_json %}
+                <tr>
+                    <td>{{ result.test_case }}</td>
+                    <td><code>{{ result.input }}</code></td>
+                    <td><code>{{ result.expected }}</code></td>
+                    <td><code>{{ result.actual }}</code></td>
+                    <td>
+                        {% if result.passed %}
+                            <span style="color: green;">✓ PASS</span>
+                        {% else %}
+                            <span style="color: red;">✗ FAIL</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    
+    <div style="text-align: center; margin-top: 2rem;">
+        <a href="{{ url_for('story') }}" class="btn" style="margin-right: 10px;">Continue to Next Story</a>
+        <a href="{{ url_for('leaderboard') }}" class="btn">View Leaderboard</a>
+    </div>
+</div>
+{% endblock %}

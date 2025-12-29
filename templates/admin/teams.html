@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manage Teams</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .card { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav { background: #333; color: white; padding: 15px; margin-bottom: 20px; }
+        .nav a { color: white; text-decoration: none; margin-right: 20px; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        .table th { background: #f8f9fa; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        .alert { padding: 10px; margin: 10px 0; border-radius: 4px; background: #d4edda; color: #155724; }
+        .high-violations { background-color: #ffebee !important; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <h1 style="margin: 0; display: inline;">Contest Admin</h1>
+        <a href="{{ url_for('admin_dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('manage_teams') }}">Teams</a>
+        <a href="{{ url_for('view_submissions') }}">Submissions</a>
+    </div>
+
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card">
+            <h2>Add New Team</h2>
+            <form method="POST" action="{{ url_for('add_team') }}">
+                <div class="form-group">
+                    <label>Team ID:</label>
+                    <input type="text" name="team_id" required>
+                </div>
+                <div class="form-group">
+                    <label>Username:</label>
+                    <input type="text" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label>Password:</label>
+                    <input type="text" name="password" required>
+                </div>
+                <button type="submit" class="btn">Add Team</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>Existing Teams</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Team ID</th>
+                        <th>Username</th>
+                        <th>Password</th>
+                        <th>IP Address</th>
+                        <th>Last Login</th>
+                        <th>Submissions</th>
+                        <th>Tab Switches</th>
+                        <th>Created At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for team in teams %}
+                    <tr>
+                        <td>{{ team.team_id }}</td>
+                        <td>{{ team.username }}</td>
+                        <td>{{ team.password }}</td>
+                        <td>{{ team.ip_address or 'Not logged in' }}</td>
+                        <td>{{ team.last_login or 'Never' }}</td>
+                        <td>{{ team.submission_count }}</td>
+                        <td class="{% if team.tab_switches > 5 %}high-violations{% endif %}">{{ team.tab_switches }}</td>
+                        <td>{{ team.created_at }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

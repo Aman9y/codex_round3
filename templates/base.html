@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Coding Contest{% endblock %}</title>
+    <style>
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        input, textarea, [contenteditable="true"], .allow-select {
+            -webkit-user-select: text !important;
+            -moz-user-select: text !important;
+            -ms-user-select: text !important;
+            user-select: text !important;
+        }
+        
+        body {
+            -webkit-user-drag: none;
+            -khtml-user-drag: none;
+            -moz-user-drag: none;
+            -o-user-drag: none;
+        }
+        
+        img {
+            -webkit-user-drag: none;
+            -khtml-user-drag: none;
+            -moz-user-drag: none;
+            -o-user-drag: none;
+            pointer-events: none;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        @media print {
+            * { display: none !important; }
+            body::before {
+                content: "Printing is not allowed during the contest.";
+                display: block !important;
+                font-size: 24px;
+                text-align: center;
+                padding: 50px;
+                color: red;
+            }
+        }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6; 
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d30 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header { 
+            background: linear-gradient(135deg, #2d2d30 0%, #3e3e42 100%);
+            color: #ffffff; 
+            padding: 1.5rem 0; 
+            margin-bottom: 2rem;
+            border-bottom: 3px solid #007acc;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        .header h1 { 
+            text-align: center; 
+            font-weight: 600;
+        }
+        .nav { text-align: center; margin-top: 1rem; }
+        .nav a { 
+            color: #ffffff; 
+            text-decoration: none; 
+            margin: 0 1rem;
+            padding: 8px 16px;
+            border: 1px solid #007acc;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+        .nav a:hover {
+            background: #007acc;
+            color: #fff;
+        }
+        .card { 
+            background: linear-gradient(145deg, #252526 0%, #2d2d30 100%);
+            padding: 2rem; 
+            border-radius: 12px; 
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+            margin-bottom: 2rem;
+            border: 1px solid #3e3e42;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.5);
+        }
+        .btn { 
+            background: #007acc;
+            color: #fff; 
+            padding: 10px 20px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            text-decoration: none; 
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        .btn:hover { 
+            background: #005a9e;
+        }
+        .btn-success { background: #28a745; }
+        .btn-success:hover { background: #218838; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-warning:hover { background: #e0a800; }
+        .btn-danger { background: #dc3545; }
+        .btn-danger:hover { background: #c82333; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 0.5rem; 
+            font-weight: 500;
+            color: #ffffff;
+        }
+        .form-group input, .form-group textarea, .form-group select { 
+            width: 100%; 
+            padding: 10px; 
+            border: 1px solid #3e3e42; 
+            border-radius: 4px;
+            background: #1e1e1e;
+            color: #e0e0e0;
+        }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+        .alert { 
+            padding: 1rem; 
+            margin-bottom: 1rem; 
+            border-radius: 4px;
+            border-left: 4px solid;
+        }
+        .alert-danger { 
+            background: rgba(220, 53, 69, 0.1); 
+            color: #f5c6cb; 
+            border-left-color: #dc3545;
+        }
+        .alert-success { 
+            background: rgba(40, 167, 69, 0.1); 
+            color: #d4edda; 
+            border-left-color: #28a745;
+        }
+        .table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 1rem;
+        }
+        .table th, .table td { 
+            padding: 12px; 
+            text-align: left; 
+            border-bottom: 1px solid #3e3e42;
+        }
+        .table th { 
+            background: #2d2d30; 
+            font-weight: 500;
+        }
+        .table tr:hover { 
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .code-editor { 
+            width: 100%; 
+            height: 400px; 
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace; 
+            font-size: 14px; 
+            border: 1px solid #3e3e42; 
+            padding: 15px;
+            background: #1e1e1e;
+            color: #e0e0e0;
+            border-radius: 4px;
+            resize: vertical;
+        }
+        .code-editor:focus {
+            outline: none;
+            border-color: #007acc;
+        }
+        .output-box { 
+            background: #1e1e1e; 
+            border: 1px solid #3e3e42; 
+            padding: 15px; 
+            margin-top: 10px; 
+            font-family: 'Consolas', monospace; 
+            white-space: pre-wrap;
+            border-radius: 4px;
+        }
+        .hint-box { 
+            background: rgba(255, 193, 7, 0.1); 
+            border: 1px solid #ffc107; 
+            padding: 1rem; 
+            margin: 1rem 0; 
+            border-radius: 4px;
+            border-left: 4px solid #ffc107;
+        }
+        .score-badge { 
+            background: #28a745; 
+            color: #fff; 
+            padding: 4px 8px; 
+            border-radius: 12px; 
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+        h1, h2, h3, h4 {
+            color: #ffffff;
+        }
+        pre {
+            background: #1e1e1e !important;
+            color: #e0e0e0 !important;
+            border: 1px solid #3e3e42 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h1>{% block header %}Coding Contest{% endblock %}</h1>
+            {% if session.team_id %}
+            <div class="nav">
+                <span>Welcome, <strong>{{ session.username }}</strong></span>
+                <a href="{{ url_for('story') }}">Stories</a>
+                <a href="{{ url_for('leaderboard') }}">Leaderboard</a>
+                <a href="{{ url_for('logout') }}">Logout</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-danger">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    {% block scripts %}{% endblock %}
+    
+    <script>
+    (function() {
+        'use strict';
+        
+        const ANTI_CHEAT_CONFIG = {
+            enableCopyPasteProtection: true,
+            enableDevToolsProtection: true,
+            enableRightClickProtection: true,
+            enableScreenshotProtection: true,
+            enableTabSwitchDetection: true,
+            showWarnings: true,
+            logViolations: true,
+            serverEndpoint: '/tab-switch'
+        };
+        
+        let tabSwitchCount = 0;
+        let isPageUnloading = false;
+        
+        if (ANTI_CHEAT_CONFIG.enableTabSwitchDetection) {
+            localStorage.removeItem('tabSwitchCount');
+            
+            fetch('/tab-switch-count')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.count) {
+                        tabSwitchCount = data.count;
+                        localStorage.setItem('tabSwitchCount', tabSwitchCount.toString());
+                    }
+                })
+                .catch(e => console.error('Failed to get tab switch count:', e));
+            
+            window.addEventListener('beforeunload', function() {
+                isPageUnloading = true;
+            });
+            
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden && !isPageUnloading) {
+                    tabSwitchCount++;
+                    localStorage.setItem('tabSwitchCount', tabSwitchCount.toString());
+                    
+                    if (ANTI_CHEAT_CONFIG.logViolations) {
+                        console.warn('Tab switch detected:', tabSwitchCount, new Date().toISOString());
+                    }
+                    
+                    fetch(ANTI_CHEAT_CONFIG.serverEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ count: tabSwitchCount })
+                    }).catch(e => console.error('Failed to log tab switch:', e));
+                    
+                    if (ANTI_CHEAT_CONFIG.showWarnings) {
+                        showAntiCheatWarning(`Tab switch detected! Count: ${tabSwitchCount}`);
+                    }
+                }
+            });
+        }
+        
+        document.addEventListener('keydown', function(e) {
+            let blocked = false;
+            let message = '';
+            
+            if (ANTI_CHEAT_CONFIG.enableCopyPasteProtection) {
+                if (e.ctrlKey && e.key === 'c') {
+                    blocked = true;
+                    message = 'Copy disabled during contest';
+                } else if (e.ctrlKey && e.key === 'v') {
+                    blocked = true;
+                    message = 'Paste disabled during contest';
+                } else if (e.ctrlKey && e.key === 'x') {
+                    blocked = true;
+                    message = 'Cut disabled during contest';
+                }
+            }
+            
+            if (ANTI_CHEAT_CONFIG.enableDevToolsProtection) {
+                if (e.key === 'F12') {
+                    blocked = true;
+                    message = 'Developer tools are disabled during the contest';
+                } else if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+                    blocked = true;
+                    message = 'Developer tools are disabled during the contest';
+                } else if (e.ctrlKey && e.shiftKey && e.key === 'J') {
+                    blocked = true;
+                    message = 'Developer tools are disabled during the contest';
+                } else if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+                    blocked = true;
+                    message = 'Developer tools are disabled during the contest';
+                } else if (e.ctrlKey && e.key === 'u') {
+                    blocked = true;
+                    message = 'View source is disabled during the contest';
+                }
+            }
+            
+            if (ANTI_CHEAT_CONFIG.enableScreenshotProtection) {
+                if (e.key === 'PrintScreen') {
+                    blocked = true;
+                    message = 'Screenshots are disabled during the contest';
+                } else if (e.altKey && e.key === 'PrintScreen') {
+                    blocked = true;
+                    message = 'Screenshots are disabled during the contest';
+                } else if (e.metaKey && e.shiftKey && e.key === 'S') {
+                    blocked = true;
+                    message = 'Screenshots are disabled during the contest';
+                }
+            }
+            
+            if (blocked) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (ANTI_CHEAT_CONFIG.showWarnings) {
+                    showAntiCheatWarning(message);
+                }
+                
+                if (ANTI_CHEAT_CONFIG.logViolations) {
+                    console.warn('Anti-cheat violation:', message, new Date().toISOString());
+                }
+                
+                return false;
+            }
+        });
+        
+        if (ANTI_CHEAT_CONFIG.enableRightClickProtection) {
+            document.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                if (ANTI_CHEAT_CONFIG.showWarnings) {
+                    showAntiCheatWarning('Right-click is disabled during the contest');
+                }
+                
+                if (ANTI_CHEAT_CONFIG.logViolations) {
+                    console.warn('Anti-cheat violation: Right-click attempted', new Date().toISOString());
+                }
+                
+                return false;
+            });
+        }
+        
+        function showAntiCheatWarning(message) {
+            const warningDiv = document.createElement('div');
+            warningDiv.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background-color: #f85149;
+                color: white;
+                padding: 10px 15px;
+                border-radius: 5px;
+                z-index: 10000;
+                font-family: 'Fira Code', monospace;
+                font-size: 14px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+                animation: slideIn 0.3s ease-out;
+                max-width: 300px;
+            `;
+            
+            warningDiv.textContent = message;
+            document.body.appendChild(warningDiv);
+            
+            setTimeout(() => {
+                if (warningDiv.parentNode) {
+                    warningDiv.parentNode.removeChild(warningDiv);
+                }
+            }, 3000);
+        }
+        
+        console.log('Anti-cheat protection activated');
+        
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>View Submissions</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .card { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .nav { background: #333; color: white; padding: 15px; margin-bottom: 20px; }
+        .nav a { color: white; text-decoration: none; margin-right: 20px; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th, .table td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        .table th { background: #f8f9fa; }
+        .score-badge { background: #28a745; color: white; padding: 4px 8px; border-radius: 12px; font-size: 0.8em; }
+        .code-preview { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; }
+        .btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <h1 style="margin: 0; display: inline;">Contest Admin</h1>
+        <a href="{{ url_for('admin_dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('manage_teams') }}">Teams</a>
+        <a href="{{ url_for('view_submissions') }}">Submissions</a>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>All Submissions</h2>
+            <div style="margin-bottom: 15px;">
+                <a href="{{ url_for('download_submissions_csv') }}" class="btn" style="background: #28a745; text-decoration: none;">Download Submissions CSV</a>
+                <a href="{{ url_for('download_violations_csv') }}" class="btn" style="background: #dc3545; text-decoration: none; margin-left: 10px;">Download Violations CSV</a>
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Team</th>
+                        <th>Question</th>
+                        <th>Score</th>
+                        <th>Tests Passed</th>
+                        <th>IP Address</th>
+                        <th>Code Preview</th>
+                        <th>Submitted At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for submission in submissions %}
+                    <tr>
+                        <td>{{ submission.username }}</td>
+                        <td>{{ submission.question_title }}</td>
+                        <td><span class="score-badge">{{ submission.score }}</span></td>
+                        <td>{{ submission.passed_tests }}/{{ submission.total_tests }}</td>
+                        <td>{{ submission.ip_address or 'N/A' }}</td>
+                        <td class="code-preview">{{ submission.code[:50] }}...</td>
+                        <td>{{ submission.submitted_at }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            
+            {% if not submissions %}
+            <p style="text-align: center; color: #666; margin: 2rem 0;">
+                No submissions yet.
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
