@@ -1,48 +1,112 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, Response, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response
 import sqlite3
-import json
-import random
-import secrets
-import csv
-import io
 import bcrypt
 import time
-from datetime import datetime
+import csv
+import io
+import random
+import os
 from functools import wraps
+from threading import Lock
 
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(32)
+app.secret_key = 'contest-admin-secret-key-2024'
 DATABASE = 'database/contest.db'
 
-# Security headers
-@app.after_request
-def add_security_headers(response):
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['X-XSS-Protection'] = '1; mode=block'
-    return response
+# Simple cache for leaderboard
+cache = {}
+cache_lock = Lock()
+CACHE_TIMEOUT = 10  # 10 seconds
+
+def get_db():
+    """Get database connection with optimizations"""
+    if not os.path.exists(DATABASE):
+        return None
+    conn = sqlite3.connect(DATABASE, timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA synchronous=NORMAL')
+    conn.execute('PRAGMA cache_size=10000')
+    return conn
 
 def admin_required(f):
+    """Decorator to require admin authentication"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        # Simple admin check - in production, implement proper authentication
         return f(*args, **kwargs)
     return decorated_function
 
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+def get_cached_leaderboard():
+    """Get cached leaderboard data"""
+    with cache_lock:
+        now = time.time()
+        if 'leaderboard' in cache and (now - cache['leaderboard_time']) < CACHE_TIMEOUT:
+            return cache['leaderboard']
+        
+        # Fetch fresh data
+        conn = get_db()
+        leaderboard = conn.execute('''
+            SELECT t.username, t.team_id,
+                   COALESCE(SUM(s.score), 0) as total_score,
+                   COUNT(s.id) as submissions,
+                   MAX(s.submitted_at) as last_submission
+            FROM teams t
+            LEFT JOIN submissions s ON t.team_id = s.team_id
+            WHERE t.username != 'admin'
+            GROUP BY t.team_id
+            ORDER BY total_score DESC, last_submission ASC
+        ''').fetchall()
+        conn.close()
+        
+        cache['leaderboard'] = leaderboard
+        cache['leaderboard_time'] = now
+        return leaderboard
 
 @app.route('/')
 @admin_required
-def admin_dashboard():
+def dashboard():
     conn = get_db()
+    if not conn:
+        return "Database not found. Please run setup_db.py first.", 500
     
-    # Get stats
-    total_teams = conn.execute('SELECT COUNT(*) as count FROM teams').fetchone()['count']
-    total_submissions = conn.execute('SELECT COUNT(*) as count FROM submissions').fetchone()['count']
-    teams_solved_story = conn.execute('SELECT COUNT(*) as count FROM team_progress WHERE story_solved = TRUE').fetchone()['count']
+    try:
+        # Optimized single query for dashboard stats
+        stats = conn.execute('''
+            SELECT 
+                (SELECT COUNT(*) FROM teams WHERE username != 'admin') as total_teams,
+                (SELECT COUNT(*) FROM submissions) as total_submissions,
+                (SELECT COUNT(DISTINCT team_id) FROM team_progress WHERE story_solved = 1) as teams_solved_story
+        ''').fetchone()
+        
+        total_teams = stats['total_teams'] if stats else 0
+        total_submissions = stats['total_submissions'] if stats else 0
+        teams_solved_story = stats['teams_solved_story'] if stats else 0
+        
+        # Get recent submissions
+        recent_submissions = conn.execute('''
+            SELECT s.*, t.username,
+                   CASE WHEN COALESCE(ts.max_switches, 0) > 0 THEN 'Yes' ELSE 'No' END as tab_alert
+            FROM submissions s 
+            JOIN teams t ON s.team_id = t.team_id 
+            LEFT JOIN (
+                SELECT team_id, MAX(switch_count) as max_switches
+                FROM tab_switches 
+                GROUP BY team_id
+            ) ts ON s.team_id = ts.team_id
+            ORDER BY s.submitted_at DESC 
+            LIMIT 10
+        ''').fetchall()
+        
+        conn.close()
+        
+        return render_template('admin/dashboard.html', 
+                             total_teams=total_teams,
+                             total_submissions=total_submissions,
+                             teams_solved_story=teams_solved_story,
+                             recent_submissions=recent_submissions)
+    except Exception as e:
+        conn.close()
+        return f"Database error: {str(e)}", 500
     
     # Get recent submissions
     recent_submissions = conn.execute('''
@@ -71,23 +135,30 @@ def admin_dashboard():
 @admin_required
 def manage_teams():
     conn = get_db()
-    teams = conn.execute('''
-        SELECT t.*, 
-               COUNT(s.id) as submission_count,
-               MAX(s.submitted_at) as last_submission,
-               COALESCE(ts.max_switches, 0) as tab_switches
-        FROM teams t
-        LEFT JOIN submissions s ON t.team_id = s.team_id
-        LEFT JOIN (
-            SELECT team_id, MAX(switch_count) as max_switches
-            FROM tab_switches 
-            GROUP BY team_id
-        ) ts ON t.team_id = ts.team_id
-        GROUP BY t.id
-        ORDER BY t.created_at
-    ''').fetchall()
-    conn.close()
-    return render_template('admin/teams.html', teams=teams)
+    if not conn:
+        return "Database not found. Please run setup_db.py first.", 500
+    
+    try:
+        teams = conn.execute('''
+            SELECT t.*, 
+                   COUNT(s.id) as submission_count,
+                   MAX(s.submitted_at) as last_submission,
+                   COALESCE(ts.max_switches, 0) as tab_switches
+            FROM teams t
+            LEFT JOIN submissions s ON t.team_id = s.team_id
+            LEFT JOIN (
+                SELECT team_id, MAX(switch_count) as max_switches
+                FROM tab_switches 
+                GROUP BY team_id
+            ) ts ON t.team_id = ts.team_id
+            GROUP BY t.id
+            ORDER BY t.created_at
+        ''').fetchall()
+        conn.close()
+        return render_template('admin/teams.html', teams=teams)
+    except Exception as e:
+        conn.close()
+        return f"Database error: {str(e)}", 500
 
 @app.route('/add_team', methods=['POST'])
 @admin_required
@@ -269,6 +340,11 @@ def timer_action():
     finally:
         conn.close()
 
+@app.route('/leaderboard/api')
+def leaderboard_api():
+    """Optimized leaderboard API with caching"""
+    return jsonify({'leaderboard': [dict(row) for row in get_cached_leaderboard()]})
+
 @app.route('/randomization')
 def view_randomization():
     conn = get_db()
@@ -305,5 +381,17 @@ def view_randomization():
     </body></html>
     '''
 
+@app.route('/test')
+def test():
+    """Simple test route to check if admin panel is working"""
+    return "<h1>Admin Panel Test</h1><p>Admin panel is working!</p><p><a href='/'>Go to Dashboard</a></p>"
+
 if __name__ == '__main__':
-    app.run( port=5123, debug=True) #host='0.0.0.0' for external access
+    # Check if database exists
+    if not os.path.exists('database'):
+        os.makedirs('database')
+    
+    if not os.path.exists(DATABASE):
+        print("Database not found. Please run 'python setup_db.py' first.")
+    
+    app.run(host='0.0.0.0', port=5123, debug=False)

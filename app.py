@@ -18,9 +18,61 @@ app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)
 DATABASE = 'database/contest.db'
 
-# Contest timer settings (in minutes)
-CONTEST_DURATION = 120  # 2 hours
-CONTEST_START_TIME = None  # Will be set when first user logs in
+# Simple cache for performance
+cache = {}
+cache_lock = threading.Lock()
+CACHE_TIMEOUT = 10  # 10 seconds
+
+# Better error messages for students
+ERROR_MESSAGES = {
+    'login_failed': 'Incorrect username or password. Please check your credentials and try again.',
+    'already_submitted': 'You have already submitted your solution for this problem. Only one submission is allowed per question.',
+    'code_too_long': 'Your code is too long. Please keep it under 10,000 characters.',
+    'compilation_error': 'There was an error compiling your code. Please check your syntax and try again.',
+    'runtime_error': 'Your code encountered an error while running. Please check your logic and try again.',
+    'timeout_error': 'Your code took too long to execute. Please optimize your solution.',
+    'invalid_input': 'Please provide valid input for your code.',
+    'network_error': 'Network connection issue. Please check your internet connection and try again.',
+    'server_error': 'Server is temporarily busy. Please wait a moment and try again.',
+    'contest_not_started': 'The contest has not started yet. Please wait for the instructor to begin.',
+    'contest_ended': 'The contest has ended. No more submissions are allowed.',
+    'story_order': 'Please solve the stories in the correct order. Complete the current story first.',
+    'rate_limit': 'You are submitting too quickly. Please wait a moment before trying again.'
+}
+
+def get_cached_leaderboard():
+    """Get cached leaderboard for better performance"""
+    with cache_lock:
+        now = time.time()
+        if 'leaderboard' in cache and (now - cache['leaderboard_time']) < CACHE_TIMEOUT:
+            return cache['leaderboard']
+        
+        # Fetch fresh leaderboard data with optimized query
+        conn = get_db()
+        teams = conn.execute('''
+            SELECT 
+                t.team_id,
+                t.username,
+                COALESCE(SUM(s.score), 0) as final_score,
+                COUNT(s.id) as submissions_count,
+                MAX(s.submitted_at) as last_submission,
+                COALESCE(h.hints_count, 0) as hints_used
+            FROM teams t
+            LEFT JOIN submissions s ON t.team_id = s.team_id
+            LEFT JOIN (
+                SELECT team_id, COUNT(*) as hints_count
+                FROM hints_used 
+                GROUP BY team_id
+            ) h ON t.team_id = h.team_id
+            WHERE t.username != 'admin'
+            GROUP BY t.team_id, t.username, h.hints_count
+            ORDER BY final_score DESC, last_submission ASC
+        ''').fetchall()
+        conn.close()
+        
+        cache['leaderboard'] = teams
+        cache['leaderboard_time'] = now
+        return teams
 
 # Security settings
 app.config['SESSION_COOKIE_SECURE'] = False  # Set to True if using HTTPS
@@ -56,6 +108,13 @@ def init_anticheat_database():
     # Initialize default timer config
     cursor.execute('INSERT OR IGNORE INTO contest_config (key, value) VALUES ("contest_start_time", "0")')
     cursor.execute('INSERT OR IGNORE INTO contest_config (key, value) VALUES ("contest_duration", "0")')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS contest_config (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    ''')
     
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS tab_switches (
@@ -211,7 +270,7 @@ def login():
             return redirect(url_for('story'))
         else:
             conn.close()
-            flash('Invalid credentials')
+            flash(ERROR_MESSAGES['login_failed'])
     
     return render_template('login.html')
 
@@ -496,8 +555,8 @@ def submit_code():
     story_id = request.form.get('story_id')
     
     # Security validation
-    if not code or len(code) > 10000 or not story_id:
-        flash('Invalid submission data')
+    if not code or len(code) > 10000:  # Max 10KB code
+        flash(ERROR_MESSAGES['code_too_long'])
         return redirect(url_for('story'))
     
     try:
@@ -516,7 +575,7 @@ def submit_code():
     
     if existing:
         conn.close()
-        flash('You have already submitted for this question!')
+        flash(ERROR_MESSAGES['already_submitted'])
         return redirect(url_for('coding', story_id=story_id))
     
     # Get test cases (use original order for evaluation)
@@ -588,59 +647,14 @@ def submit_code():
 
 @app.route('/leaderboard')
 def leaderboard():
-    conn = get_db()
-    
-    # Get leaderboard with total scores across all stories
-    teams = conn.execute('''
-        SELECT 
-            t.team_id,
-            t.username,
-            COALESCE(SUM(s.score), 0) as final_score,
-            COUNT(s.id) as submissions_count,
-            MAX(s.submitted_at) as last_submission,
-            COALESCE(h.hints_count, 0) as hints_used
-        FROM teams t
-        LEFT JOIN submissions s ON t.team_id = s.team_id
-        LEFT JOIN (
-            SELECT 
-                team_id, 
-                COUNT(*) as hints_count
-            FROM hints_used 
-            GROUP BY team_id
-        ) h ON t.team_id = h.team_id
-        GROUP BY t.team_id, t.username, h.hints_count
-        ORDER BY final_score DESC, last_submission ASC
-    ''').fetchall()
-    
-    conn.close()
-    
+    """Optimized leaderboard with caching"""
+    teams = get_cached_leaderboard()
     return render_template('leaderboard.html', teams=teams)
 
 @app.route('/api/leaderboard')
 def api_leaderboard():
-    conn = get_db()
-    teams = conn.execute('''
-        SELECT 
-            t.team_id,
-            t.username,
-            COALESCE(SUM(s.score), 0) as final_score,
-            COUNT(s.id) as submissions_count,
-            MAX(s.submitted_at) as last_submission,
-            COALESCE(h.hints_count, 0) as hints_used
-        FROM teams t
-        LEFT JOIN submissions s ON t.team_id = s.team_id
-        LEFT JOIN (
-            SELECT 
-                team_id, 
-                COUNT(*) as hints_count
-            FROM hints_used 
-            GROUP BY team_id
-        ) h ON t.team_id = h.team_id
-        GROUP BY t.team_id, t.username, h.hints_count
-        ORDER BY final_score DESC, last_submission ASC
-    ''').fetchall()
-    conn.close()
-    
+    """Cached API endpoint for leaderboard"""
+    teams = get_cached_leaderboard()
     return jsonify([dict(team) for team in teams])
 
 @app.route('/api/timer')

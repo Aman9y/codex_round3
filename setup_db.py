@@ -6,21 +6,24 @@ def setup_database():
     """Initialize database with sample data"""
     conn = sqlite3.connect('database/contest.db')
     
-    # Create tables
-    with open('database/schema.sql', 'r') as f:
-        conn.executescript(f.read())
+    # Create tables (skip if exists)
+    try:
+        with open('database/schema.sql', 'r') as f:
+            conn.executescript(f.read())
+    except sqlite3.OperationalError:
+        pass  # Tables already exist
     
-    # Sample teams with simple passwords (will be hashed)
+    # Sample teams
     teams = [
-        ('team01', 'alpha', 'alpha123'),
-        ('team02', 'beta', 'beta123'),
-        ('team03', 'gamma', 'gamma123'),
-        ('team04', 'delta', 'delta123'),
-        ('team05', 'epsilon', 'epsilon123'),
+        ('team01', 'alpha', 'pass123'),
+        ('team02', 'beta', 'pass123'),
+        ('team03', 'gamma', 'pass123'),
+        ('team04', 'delta', 'pass123'),
+        ('team05', 'epsilon', 'pass123'),
     ]
     
     for team_id, username, password in teams:
-        # Hash the password using bcrypt
+        # Hash password with bcrypt
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         conn.execute(
             'INSERT OR IGNORE INTO teams (team_id, username, password, plain_password) VALUES (?, ?, ?, ?)',

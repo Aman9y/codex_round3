@@ -88,17 +88,8 @@
 <script>
 // Language templates
 const codeTemplates = {
-    python: `# Write your Python code here
-n = int(input())
-print(n)`,
-    c: `#include <stdio.h>
-
-int main() {
-    int n;
-    scanf("%d", &n);
-    printf("%d\\n", n);
-    return 0;
-}`
+    python: ``,
+    c: ``
 };
 
 // Update line numbers
@@ -148,8 +139,8 @@ document.getElementById('languageSelect').addEventListener('change', function() 
     }
 });
 
-// Initialize with Python template
-document.getElementById('codeEditor').value = codeTemplates.python;
+// Initialize with empty editor
+document.getElementById('codeEditor').value = '';
 updateLineNumbers();
 
 // Add Tab key support and line number updates

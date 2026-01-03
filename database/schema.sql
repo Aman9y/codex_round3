@@ -99,6 +99,12 @@ CREATE TABLE tab_switches (
     FOREIGN KEY (team_id) REFERENCES teams (team_id)
 );
 
+-- Contest configuration
+CREATE TABLE contest_config (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 -- Leaderboard view
 CREATE VIEW leaderboard_view AS
 SELECT 
