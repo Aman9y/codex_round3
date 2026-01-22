@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUBMISSION COMPLETE - CODEX3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Geist Mono', monospace; }
+        body { 
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #10b981;
+            overflow-x: hidden;
+        }
+        .scanlines::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(16, 185, 129, 0.03) 2px,
+                rgba(16, 185, 129, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 1000;
+        }
+        .glitch {
+            animation: glitch 2s infinite;
+        }
+        @keyframes glitch {
+            0%, 100% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+        }
+        .terminal-border {
+            border: 2px solid #10b981;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+        }
+        .code-block {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            border: 1px solid #10b981;
+            box-shadow: inset 0 0 10px rgba(16, 185, 129, 0.1);
+        }
+        .status-pass { color: #10b981; text-shadow: 0 0 5px #10b981; }
+        .status-fail { color: #ef4444; text-shadow: 0 0 5px #ef4444; }
+        .cyber-btn {
+            background: linear-gradient(45deg, #0f172a, #1e293b);
+            border: 2px solid #10b981;
+            color: #10b981;
+            transition: all 0.3s ease;
+        }
+        .cyber-btn:hover {
+            background: #10b981;
+            color: #0f172a;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        }
+    </style>
+</head>
+<body class="scanlines">
+    <div class="min-h-screen p-4">
+        <div class="max-w-6xl mx-auto">
+            <!-- Header -->
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-bold text-emerald-400 glitch mb-2">
+                    [SUBMISSION_COMPLETE]
+                </h1>
+                <div class="text-emerald-500 text-sm">
+                    >>> CODE EVALUATION FINISHED
+                </div>
+            </div>
+
+            <!-- Main Terminal -->
+            <div class="terminal-border bg-black bg-opacity-80 p-6 rounded-lg mb-6">
+                <!-- Success Message -->
+                <div class="mb-6 p-4 bg-emerald-900 bg-opacity-30 border border-emerald-500 rounded">
+                    <div class="text-emerald-400 font-bold text-lg">
+                        ✓ SUBMISSION PROCESSED SUCCESSFULLY
+                    </div>
+                    <div class="text-emerald-300 text-sm mt-1">
+                        Your code has been compiled, executed, and evaluated against all test cases.
+                    </div>
+                </div>
+
+                <!-- Results Summary -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="terminal-border bg-slate-900 p-4 rounded">
+                        <div class="text-emerald-400 text-sm mb-1">FINAL SCORE</div>
+                        <div class="text-2xl font-bold text-emerald-300">{{ submission.score }} PTS</div>
+                    </div>
+                    <div class="terminal-border bg-slate-900 p-4 rounded">
+                        <div class="text-emerald-400 text-sm mb-1">TESTS PASSED</div>
+                        <div class="text-2xl font-bold text-emerald-300">{{ submission.passed_tests }}/{{ submission.total_tests }}</div>
+                    </div>
+                    <div class="terminal-border bg-slate-900 p-4 rounded">
+                        <div class="text-emerald-400 text-sm mb-1">SUBMITTED AT</div>
+                        <div class="text-lg font-bold text-emerald-300">{{ submission.submitted_at }}</div>
+                    </div>
+                </div>
+
+                <!-- Code Display -->
+                <div class="mb-6">
+                    <div class="text-emerald-400 font-bold mb-3">
+                        >>> YOUR_CODE.{{ submission.language.lower() }}
+                    </div>
+                    <div class="code-block p-4 rounded overflow-x-auto">
+                        <pre class="text-emerald-300 text-sm"><code>{{ submission.code }}</code></pre>
+                    </div>
+                </div>
+
+                <!-- Test Results -->
+                {% if submission.test_results %}
+                <div class="mb-6">
+                    <div class="text-emerald-400 font-bold mb-3">
+                        >>> TEST_EXECUTION_RESULTS
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-emerald-500">
+                                    <th class="text-left p-2 text-emerald-400">TEST</th>
+                                    <th class="text-left p-2 text-emerald-400">INPUT</th>
+                                    <th class="text-left p-2 text-emerald-400">EXPECTED</th>
+                                    <th class="text-left p-2 text-emerald-400">OUTPUT</th>
+                                    <th class="text-left p-2 text-emerald-400">STATUS</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for result in submission.test_results | from_json %}
+                                <tr class="border-b border-emerald-800">
+                                    <td class="p-2 text-emerald-300">{{ result.test_case }}</td>
+                                    <td class="p-2 text-emerald-300 font-mono">{{ result.input }}</td>
+                                    <td class="p-2 text-emerald-300 font-mono">{{ result.expected }}</td>
+                                    <td class="p-2 text-emerald-300 font-mono">{{ result.actual }}</td>
+                                    <td class="p-2">
+                                        {% if result.passed %}
+                                            <span class="status-pass font-bold">✓ PASS</span>
+                                        {% else %}
+                                            <span class="status-fail font-bold">✗ FAIL</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Navigation -->
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="{{ url_for('story') }}" class="cyber-btn px-6 py-3 rounded text-center font-bold">
+                        >>> CONTINUE_TO_NEXT_STORY
+                    </a>
+                    <a href="{{ url_for('leaderboard') }}" class="cyber-btn px-6 py-3 rounded text-center font-bold">
+                        >>> VIEW_LEADERBOARD
+                    </a>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="text-center text-emerald-600 text-xs">
+                CODEX3 CONTEST SYSTEM v2.0 | SECURE EVALUATION COMPLETE
+            </div>
+        </div>
+    </div>
+</body>
+</html>

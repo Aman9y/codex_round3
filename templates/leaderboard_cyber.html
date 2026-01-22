@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberCode: Leaderboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap');
+        
+        body {
+            font-family: 'Geist Mono', monospace;
+            background-color: #09090b;
+            color: #ecfdf5;
+            overflow-x: hidden;
+        }
+
+        .glitch-text {
+            text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75), -0.025em -0.05em 0 rgba(0, 255, 0, 0.75), 0.025em 0.05em 0 rgba(0, 0, 255, 0.75);
+            animation: glitch 500ms infinite;
+        }
+
+        @keyframes glitch {
+            0% { text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75), -0.05em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
+            15% { text-shadow: -0.05em -0.025em 0 rgba(255, 0, 0, 0.75), 0.025em 0.025em 0 rgba(0, 255, 0, 0.75), -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
+            50% { text-shadow: 0.025em 0.05em 0 rgba(255, 0, 0, 0.75), 0.05em 0 0 rgba(0, 255, 0, 0.75), 0 -0.05em 0 rgba(0, 0, 255, 0.75); }
+            100% { text-shadow: -0.025em 0 0 rgba(255, 0, 0, 0.75), -0.025em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em -0.05em 0 rgba(0, 0, 255, 0.75); }
+        }
+
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 10;
+            background: linear-gradient(0deg, rgba(0, 0, 0, 0) 0%, rgba(16, 185, 129, 0.05) 50%, rgba(0, 0, 0, 0) 100%);
+            position: fixed;
+            bottom: 100%;
+            pointer-events: none;
+            animation: scanline 8s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            100% { bottom: -100%; }
+        }
+
+        .terminal-shadow {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+        }
+
+        .rank-1 { color: #ffd700; }
+        .rank-2 { color: #c0c0c0; }
+        .rank-3 { color: #cd7f32; }
+    </style>
+</head>
+<body class="min-h-screen p-4">
+    <div class="scanline"></div>
+
+    <div class="max-w-6xl mx-auto space-y-6">
+        <!-- Header -->
+        <div class="flex justify-between items-center">
+            <div class="text-[10px] text-emerald-500/50 uppercase">Root@Mainframe:~/Leaderboard</div>
+            <div class="flex gap-4 text-xs">
+                <div id="contestTimer" class="text-emerald-400"></div>
+                <a href="/story" class="text-zinc-400 hover:text-emerald-400 uppercase">← Back</a>
+                <a href="/logout" class="text-zinc-400 hover:text-red-400 uppercase">Logout</a>
+            </div>
+        </div>
+
+        <!-- Title -->
+        <div class="text-center">
+            <h1 class="text-4xl font-bold text-emerald-500 uppercase glitch-text mb-2">Global Rankings</h1>
+            <p class="text-zinc-500 text-sm uppercase">Live Contest Leaderboard</p>
+        </div>
+
+        <!-- Leaderboard -->
+        <div class="border border-emerald-900/50 bg-zinc-950/80 rounded-lg terminal-shadow overflow-hidden">
+            <div class="bg-zinc-900 px-6 py-3 border-b border-emerald-900/30">
+                <div class="grid grid-cols-6 gap-4 text-xs font-bold text-emerald-500 uppercase">
+                    <div>Rank</div>
+                    <div>Team</div>
+                    <div>Score</div>
+                    <div>Submissions</div>
+                    <div>Hints Used</div>
+                    <div>Last Activity</div>
+                </div>
+            </div>
+            
+            <div id="leaderboard-content" class="divide-y divide-zinc-800">
+                {% for team in teams %}
+                <div class="px-6 py-4 hover:bg-zinc-900/30 transition-colors">
+                    <div class="grid grid-cols-6 gap-4 text-sm items-center">
+                        <div class="font-bold {% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% else %}text-zinc-400{% endif %}">
+                            #{{ loop.index }}
+                        </div>
+                        <div class="text-emerald-400 font-mono">{{ team.username }}</div>
+                        <div class="text-emerald-300 font-bold">{{ team.final_score }}</div>
+                        <div class="text-zinc-400">{{ team.submissions_count }}</div>
+                        <div class="text-zinc-400">{{ team.hints_used }}</div>
+                        <div class="text-zinc-500 text-xs">{{ team.last_submission or 'Never' }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-3 gap-4">
+            <div class="bg-zinc-950/50 border border-zinc-800 p-4 rounded-lg text-center">
+                <div class="text-2xl font-bold text-emerald-500">{{ teams|length }}</div>
+                <div class="text-xs text-zinc-400 uppercase">Total Teams</div>
+            </div>
+            <div class="bg-zinc-950/50 border border-zinc-800 p-4 rounded-lg text-center">
+                <div class="text-2xl font-bold text-emerald-500">{{ teams|selectattr('submissions_count', 'greaterthan', 0)|list|length }}</div>
+                <div class="text-xs text-zinc-400 uppercase">Active Teams</div>
+            </div>
+            <div class="bg-zinc-950/50 border border-zinc-800 p-4 rounded-lg text-center">
+                <div class="text-2xl font-bold text-emerald-500">{{ teams|map(attribute='final_score')|max or 0 }}</div>
+                <div class="text-xs text-zinc-400 uppercase">Highest Score</div>
+            </div>
+        </div>
+
+        <div class="text-center text-xs text-zinc-600 uppercase">
+            Auto-refreshes every 10 seconds
+        </div>
+    </div>
+
+    <script>
+        // Auto-refresh leaderboard
+        function refreshLeaderboard() {
+            fetch('/api/leaderboard')
+                .then(response => response.json())
+                .then(teams => {
+                    const content = document.getElementById('leaderboard-content');
+                    content.innerHTML = '';
+                    
+                    teams.forEach((team, index) => {
+                        const rankClass = index === 0 ? 'rank-1' : index === 1 ? 'rank-2' : index === 2 ? 'rank-3' : 'text-zinc-400';
+                        
+                        content.innerHTML += `
+                            <div class="px-6 py-4 hover:bg-zinc-900/30 transition-colors">
+                                <div class="grid grid-cols-6 gap-4 text-sm items-center">
+                                    <div class="font-bold ${rankClass}">#${index + 1}</div>
+                                    <div class="text-emerald-400 font-mono">${team.username}</div>
+                                    <div class="text-emerald-300 font-bold">${team.final_score}</div>
+                                    <div class="text-zinc-400">${team.submissions_count}</div>
+                                    <div class="text-zinc-400">${team.hints_used}</div>
+                                    <div class="text-zinc-500 text-xs">${team.last_submission || 'Never'}</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                })
+                .catch(error => console.error('Failed to refresh leaderboard:', error));
+        }
+
+        // Timer functionality
+        function updateTimer() {
+            fetch('/api/timer')
+                .then(response => response.json())
+                .then(data => {
+                    const timerElement = document.getElementById('contestTimer');
+                    if (!timerElement) return;
+                    
+                    if (!data.started) {
+                        timerElement.textContent = 'Contest not started';
+                        return;
+                    }
+                    
+                    if (data.finished) {
+                        timerElement.textContent = 'Contest Ended';
+                        timerElement.className = 'text-red-500 font-bold';
+                        return;
+                    }
+                    
+                    const hours = Math.floor(data.remaining / 3600);
+                    const minutes = Math.floor((data.remaining % 3600) / 60);
+                    const seconds = Math.floor(data.remaining % 60);
+                    
+                    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    timerElement.textContent = `Time: ${timeString}`;
+                    
+                    if (data.remaining <= 300) {
+                        timerElement.className = 'text-red-500 font-bold';
+                    } else if (data.remaining <= 900) {
+                        timerElement.className = 'text-yellow-500';
+                    } else {
+                        timerElement.className = 'text-emerald-400';
+                    }
+                })
+                .catch(error => {
+                    console.error('Timer update failed:', error);
+                });
+        }
+        
+        // Start intervals
+        updateTimer();
+        setInterval(updateTimer, 1000);
+        setInterval(refreshLeaderboard, 10000);
+    </script>
+</body>
+</html>

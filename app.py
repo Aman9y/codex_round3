@@ -203,21 +203,31 @@ def rate_limit(max_requests=10, window=60):
         return decorated_function
     return decorator
 
-def contest_started_required(f):
-    """Decorator to check if contest has started"""
+def contest_active_required(f):
+    """Decorator to check if contest is active (started and not ended)"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         conn = get_db()
         try:
-            config = conn.execute('SELECT value FROM contest_config WHERE key = "contest_start_time"').fetchone()
-            start_time = int(config['value']) if config else 0
+            config = conn.execute('SELECT key, value FROM contest_config WHERE key IN ("contest_start_time", "contest_duration")').fetchall()
+            config_dict = {row['key']: int(row['value']) for row in config}
+            
+            start_time = config_dict.get('contest_start_time', 0)
+            duration = config_dict.get('contest_duration', 0)
+            
+            if start_time == 0:
+                return render_template('contest_not_started_cyber.html')
+            
+            elapsed = int(time.time()) - start_time
+            if elapsed >= duration:
+                flash('Contest has ended! No more submissions allowed.')
+                return redirect(url_for('leaderboard'))
+                
         except:
-            start_time = 0
+            pass
         finally:
             conn.close()
         
-        if start_time == 0:
-            return render_template('contest_not_started.html')
         return f(*args, **kwargs)
     return decorated_function
 
@@ -246,7 +256,7 @@ def login():
         # Input validation
         if not username or not password or len(username) > 50 or len(password) > 50:
             flash('Invalid credentials')
-            return render_template('login.html')
+            return render_template('login_cyber.html')
         
         conn = get_db()
         team = conn.execute(
@@ -272,7 +282,7 @@ def login():
             conn.close()
             flash(ERROR_MESSAGES['login_failed'])
     
-    return render_template('login.html')
+    return render_template('login_cyber.html')
 
 @app.route('/logout')
 def logout():
@@ -282,7 +292,7 @@ def logout():
 @app.route('/story')
 @app.route('/story/<int:story_id>')
 @login_required
-@contest_started_required
+@contest_active_required
 def story(story_id=None):
     conn = get_db()
     
@@ -341,7 +351,7 @@ def story(story_id=None):
     
     conn.close()
     
-    return render_template('story.html', 
+    return render_template('story_cyber.html', 
                          story=story, 
                          all_stories=story_list,
                          current_story_id=story_id,
@@ -351,7 +361,7 @@ def story(story_id=None):
 
 @app.route('/solve_story', methods=['POST'])
 @login_required
-@contest_started_required
+@contest_active_required
 def solve_story():
     answer = request.form.get('answer', '').strip().lower()
     story_id = request.form.get('story_id')
@@ -413,7 +423,7 @@ def solve_story():
 
 @app.route('/use_hint', methods=['POST'])
 @login_required
-@contest_started_required
+@contest_active_required
 def use_hint():
     story_id = request.form['story_id']
     hint_number = request.form['hint_number']
@@ -439,7 +449,7 @@ def use_hint():
 
 @app.route('/coding/<int:story_id>')
 @login_required
-@contest_started_required
+@contest_active_required
 def coding(story_id):
     conn = get_db()
     
@@ -460,7 +470,7 @@ def coding(story_id):
             (session['team_id'], story_id)
         ).fetchone()
         conn.close()
-        return render_template('submission_complete.html', submission=submission)
+        return render_template('submission_complete_cyber.html', submission=submission)
     
     # Verify this is the team's current allowed story (only for new submissions)
     team_seed = hash(session['team_id']) % 1000
@@ -515,11 +525,11 @@ def coding(story_id):
     
     conn.close()
     
-    return render_template('coding.html', question=question_dict, story_id=story_id)
+    return render_template('coding_cyber.html', question=question_dict, story_id=story_id)
 
 @app.route('/run_code', methods=['POST'])
 @login_required
-@contest_started_required
+@contest_active_required
 @rate_limit(max_requests=20, window=60)  # 20 code runs per minute
 def run_code():
     data = request.get_json()
@@ -547,7 +557,7 @@ def run_code():
 
 @app.route('/submit_code', methods=['POST'])
 @login_required
-@contest_started_required
+@contest_active_required
 @rate_limit(max_requests=3, window=300)  # 3 submissions per 5 minutes
 def submit_code():
     code = request.form.get('code', '').strip()
@@ -594,12 +604,28 @@ def submit_code():
         expected = test_case['output'].strip()
         actual = result['output'].strip() if result['success'] else ''
         
+        # Smart comparison - case insensitive for common outputs
+        def smart_compare(expected, actual):
+            # Exact match first
+            if actual == expected:
+                return True
+            
+            # Case insensitive comparison
+            if actual.lower() == expected.lower():
+                return True
+            
+            # Remove extra whitespace and compare
+            if actual.replace(' ', '').lower() == expected.replace(' ', '').lower():
+                return True
+                
+            return False
+        
         test_result = {
             'test_case': i + 1,
             'input': test_case['input'],
             'expected': expected,
             'actual': actual,
-            'passed': actual == expected and result['success']
+            'passed': smart_compare(expected, actual) and result['success']
         }
         results.append(test_result)
         if test_result['passed']:
@@ -649,7 +675,7 @@ def submit_code():
 def leaderboard():
     """Optimized leaderboard with caching"""
     teams = get_cached_leaderboard()
-    return render_template('leaderboard.html', teams=teams)
+    return render_template('leaderboard_cyber.html', teams=teams)
 
 @app.route('/api/leaderboard')
 def api_leaderboard():

@@ -321,17 +321,29 @@ def timer_action():
     
     try:
         if action == 'start':
+            # Set default 2-hour duration if not set
+            duration_result = conn.execute('SELECT value FROM contest_config WHERE key = "contest_duration"').fetchone()
+            if not duration_result or int(duration_result['value']) == 0:
+                conn.execute('INSERT OR REPLACE INTO contest_config (key, value) VALUES ("contest_duration", "7200")')  # 2 hours
+            
             conn.execute('INSERT OR REPLACE INTO contest_config (key, value) VALUES ("contest_start_time", ?)', 
                        (str(int(time.time())),))
         elif action == 'reset':
             conn.execute('INSERT OR REPLACE INTO contest_config (key, value) VALUES ("contest_start_time", "0")')
+            conn.execute('INSERT OR REPLACE INTO contest_config (key, value) VALUES ("contest_duration", "7200")')  # Reset to 2 hours
         elif action == 'extend':
             minutes = request.json.get('minutes', 30)
             result = conn.execute('SELECT value FROM contest_config WHERE key = "contest_duration"').fetchone()
-            current_duration = int(result['value']) if result else 0
+            current_duration = int(result['value']) if result else 7200
             new_duration = current_duration + (minutes * 60)
             conn.execute('INSERT OR REPLACE INTO contest_config (key, value) VALUES ("contest_duration", ?)', 
                        (str(new_duration),))
+        elif action == 'set_duration':
+            hours = request.json.get('hours', 2)
+            minutes = request.json.get('minutes', 0)
+            total_seconds = (hours * 3600) + (minutes * 60)
+            conn.execute('INSERT OR REPLACE INTO contest_config (key, value) VALUES ("contest_duration", ?)', 
+                       (str(total_seconds),))
         
         conn.commit()
         return jsonify({'success': True})
@@ -394,4 +406,4 @@ if __name__ == '__main__':
     if not os.path.exists(DATABASE):
         print("Database not found. Please run 'python setup_db.py' first.")
     
-    app.run(host='0.0.0.0', port=5123, debug=False)
+    app.run(port=5123, debug=False) #host='0.0.0.0', for external access

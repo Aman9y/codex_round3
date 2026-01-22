@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codex: Terminal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/python/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/clike/clike.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap');
+        
+        body {
+            font-family: 'Geist Mono', monospace;
+            background-color: #09090b;
+            color: #ecfdf5;
+            overflow-x: hidden;
+        }
+
+        .CodeMirror {
+            height: 100%;
+            background: transparent !important;
+            color: #10b981 !important;
+            font-family: 'Geist Mono', monospace !important;
+            font-size: 14px;
+            line-height: 1.5;
+            max-height: 400px;
+        }
+        
+        .CodeMirror-scroll {
+            overflow-y: auto !important;
+            overflow-x: auto !important;
+        }
+        
+        .CodeMirror-gutters {
+            background: #18181b !important;
+            border-right: 1px solid #065f46 !important;
+        }
+        
+        .CodeMirror-linenumber {
+            color: #6b7280 !important;
+        }
+        
+        .CodeMirror-cursor {
+            border-left: 1px solid #10b981 !important;
+        }
+
+        .glitch-text {
+            text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75), -0.025em -0.05em 0 rgba(0, 255, 0, 0.75), 0.025em 0.05em 0 rgba(0, 0, 255, 0.75);
+            animation: glitch 500ms infinite;
+        }
+
+        @keyframes glitch {
+            0% { text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75), -0.05em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
+            15% { text-shadow: -0.05em -0.025em 0 rgba(255, 0, 0, 0.75), 0.025em 0.025em 0 rgba(0, 255, 0, 0.75), -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
+            50% { text-shadow: 0.025em 0.05em 0 rgba(255, 0, 0, 0.75), 0.05em 0 0 rgba(0, 255, 0, 0.75), 0 -0.05em 0 rgba(0, 0, 255, 0.75); }
+            100% { text-shadow: -0.025em 0 0 rgba(255, 0, 0, 0.75), -0.025em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em -0.05em 0 rgba(0, 0, 255, 0.75); }
+        }
+
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 10;
+            background: linear-gradient(0deg, rgba(0, 0, 0, 0) 0%, rgba(16, 185, 129, 0.05) 50%, rgba(0, 0, 0, 0) 100%);
+            position: fixed;
+            bottom: 100%;
+            pointer-events: none;
+            animation: scanline 8s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            100% { bottom: -100%; }
+        }
+
+        .terminal-shadow {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4">
+    <div class="scanline"></div>
+
+    <div class="max-w-7xl mx-auto h-[95vh] flex flex-col">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-4">
+            <div class="text-[10px] text-emerald-500 font-bold uppercase tracking-widest">Codex_IDE v1.0.4 // Level_{{ story_id }}</div>
+            <div class="flex gap-4 text-xs">
+                <div id="contestTimer" class="text-emerald-400"></div>
+                <a href="/story" class="text-zinc-400 hover:text-emerald-400 uppercase">← Back</a>
+                <a href="/logout" class="text-zinc-400 hover:text-red-400 uppercase">Logout</a>
+            </div>
+        </div>
+
+        <!-- Terminal Container -->
+        <div class="flex-1 flex flex-col border border-emerald-900/30 rounded overflow-hidden terminal-shadow">
+            <!-- Terminal Header -->
+            <div class="bg-zinc-900 px-4 py-2 border-b border-emerald-900/30 flex justify-between items-center">
+                <div class="text-emerald-500 font-bold uppercase text-xs">{{ question.title }}</div>
+                <div class="flex gap-2">
+                    <button id="run-btn" class="bg-emerald-600 hover:bg-emerald-500 text-black text-xs font-bold px-4 py-1 rounded uppercase">Run_Tests</button>
+                    <button id="submit-btn" class="bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-4 py-1 rounded uppercase">Submit</button>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="flex-1 flex bg-black">
+                <!-- Code Editor -->
+                <div class="flex-1 flex flex-col">
+                    <div class="bg-zinc-900/50 px-4 py-2 border-b border-emerald-900/20">
+                        <select id="language-select" class="bg-black border border-emerald-900/50 text-emerald-500 text-xs px-2 py-1 rounded">
+                            <option value="python">Python</option>
+                            <option value="c">C</option>
+                        </select>
+                    </div>
+                    <div id="code-editor" class="flex-1"></div>
+                </div>
+
+                <!-- Sidebar -->
+                <div class="w-80 border-l border-emerald-900/20 p-4 text-xs space-y-4 bg-zinc-950/50">
+                    <div class="text-emerald-500 font-bold uppercase underline">Mission Briefing</div>
+                    <div class="text-zinc-300 leading-relaxed">{{ question.problem_statement }}</div>
+                    
+                    {% if question.constraints %}
+                    <div>
+                        <div class="text-emerald-500 font-bold uppercase text-[10px] mb-1">Constraints</div>
+                        <div class="text-zinc-400">{{ question.constraints }}</div>
+                    </div>
+                    {% endif %}
+
+                    <div>
+                        <div class="text-emerald-500 font-bold uppercase text-[10px] mb-1">Sample Input</div>
+                        <div class="bg-black border border-emerald-900/30 p-2 rounded text-emerald-400 font-mono">{{ question.sample_input }}</div>
+                    </div>
+
+                    <div>
+                        <div class="text-emerald-500 font-bold uppercase text-[10px] mb-1">Expected Output</div>
+                        <div class="bg-black border border-emerald-900/30 p-2 rounded text-emerald-400 font-mono">{{ question.sample_output }}</div>
+                    </div>
+
+                    <div id="test-results" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- Console Output -->
+            <div id="console-output" class="h-32 bg-zinc-950 border-t border-emerald-900/20 p-4 overflow-y-auto text-xs font-mono text-zinc-500">
+                <div>[SYSTEM] Waiting for execution...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Form for Submission -->
+    <form id="submit-form" method="POST" action="/submit_code" style="display: none;">
+        <input type="hidden" name="story_id" value="{{ story_id }}">
+        <input type="hidden" name="code" id="submit-code">
+        <input type="hidden" name="language" id="submit-language">
+    </form>
+
+    <script>
+        // Anti-cheat protection
+        (function() {
+            'use strict';
+            
+            const ANTI_CHEAT_CONFIG = {
+                enableCopyPasteProtection: true,
+                enableDevToolsProtection: true,
+                enableRightClickProtection: true,
+                enableScreenshotProtection: true,
+                enableTabSwitchDetection: true,
+                showWarnings: true,
+                logViolations: true,
+                serverEndpoint: '/tab-switch'
+            };
+            
+            let tabSwitchCount = 0;
+            let isPageUnloading = false;
+            
+            if (ANTI_CHEAT_CONFIG.enableTabSwitchDetection) {
+                localStorage.removeItem('tabSwitchCount');
+                
+                fetch('/tab-switch-count')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.count) {
+                            tabSwitchCount = data.count;
+                            localStorage.setItem('tabSwitchCount', tabSwitchCount.toString());
+                        }
+                    })
+                    .catch(e => console.error('Failed to get tab switch count:', e));
+                
+                window.addEventListener('beforeunload', function() {
+                    isPageUnloading = true;
+                });
+                
+                document.addEventListener('visibilitychange', function() {
+                    if (document.hidden && !isPageUnloading) {
+                        tabSwitchCount++;
+                        localStorage.setItem('tabSwitchCount', tabSwitchCount.toString());
+                        
+                        if (ANTI_CHEAT_CONFIG.logViolations) {
+                            console.warn('Tab switch detected:', tabSwitchCount, new Date().toISOString());
+                        }
+                        
+                        fetch(ANTI_CHEAT_CONFIG.serverEndpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ count: tabSwitchCount })
+                        }).catch(e => console.error('Failed to log tab switch:', e));
+                        
+                        if (ANTI_CHEAT_CONFIG.showWarnings) {
+                            showAntiCheatWarning(`Tab switch detected! Count: ${tabSwitchCount}`);
+                        }
+                    }
+                });
+            }
+            
+            document.addEventListener('keydown', function(e) {
+                let blocked = false;
+                let message = '';
+                
+                if (ANTI_CHEAT_CONFIG.enableCopyPasteProtection) {
+                    if (e.ctrlKey && e.key === 'c') {
+                        blocked = true;
+                        message = 'Copy disabled during contest';
+                    } else if (e.ctrlKey && e.key === 'v') {
+                        blocked = true;
+                        message = 'Paste disabled during contest';
+                    } else if (e.ctrlKey && e.key === 'x') {
+                        blocked = true;
+                        message = 'Cut disabled during contest';
+                    }
+                }
+                
+                if (ANTI_CHEAT_CONFIG.enableDevToolsProtection) {
+                    if (e.key === 'F12') {
+                        blocked = true;
+                        message = 'Developer tools are disabled during the contest';
+                    } else if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+                        blocked = true;
+                        message = 'Developer tools are disabled during the contest';
+                    } else if (e.ctrlKey && e.shiftKey && e.key === 'J') {
+                        blocked = true;
+                        message = 'Developer tools are disabled during the contest';
+                    } else if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+                        blocked = true;
+                        message = 'Developer tools are disabled during the contest';
+                    } else if (e.ctrlKey && e.key === 'u') {
+                        blocked = true;
+                        message = 'View source is disabled during the contest';
+                    }
+                }
+                
+                if (ANTI_CHEAT_CONFIG.enableScreenshotProtection) {
+                    if (e.key === 'PrintScreen') {
+                        blocked = true;
+                        message = 'Screenshots are disabled during contest';
+                    } else if (e.altKey && e.key === 'PrintScreen') {
+                        blocked = true;
+                        message = 'Screenshots are disabled during contest';
+                    } else if (e.metaKey && e.shiftKey && e.key === 'S') {
+                        blocked = true;
+                        message = 'Screenshots are disabled during contest';
+                    }
+                }
+                
+                if (blocked) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    if (ANTI_CHEAT_CONFIG.showWarnings) {
+                        showAntiCheatWarning(message);
+                    }
+                    
+                    if (ANTI_CHEAT_CONFIG.logViolations) {
+                        console.warn('Anti-cheat violation:', message, new Date().toISOString());
+                    }
+                    
+                    return false;
+                }
+            });
+            
+            if (ANTI_CHEAT_CONFIG.enableRightClickProtection) {
+                document.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    if (ANTI_CHEAT_CONFIG.showWarnings) {
+                        showAntiCheatWarning('Right-click disabled during contest');
+                    }
+                    
+                    if (ANTI_CHEAT_CONFIG.logViolations) {
+                        console.warn('Anti-cheat violation: Right-click attempted', new Date().toISOString());
+                    }
+                    
+                    return false;
+                });
+            }
+            
+            function showAntiCheatWarning(message) {
+                const warningDiv = document.createElement('div');
+                warningDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background-color: #f85149;
+                    color: white;
+                    padding: 10px 15px;
+                    border-radius: 5px;
+                    z-index: 10000;
+                    font-family: 'Geist Mono', monospace;
+                    font-size: 12px;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+                    max-width: 300px;
+                    text-transform: uppercase;
+                `;
+                
+                warningDiv.textContent = message;
+                document.body.appendChild(warningDiv);
+                
+                setTimeout(() => {
+                    if (warningDiv.parentNode) {
+                        warningDiv.parentNode.removeChild(warningDiv);
+                    }
+                }, 3000);
+            }
+            
+            console.log('Anti-cheat protection activated');
+        })();
+
+        // Initialize CodeMirror after DOM loads
+        window.addEventListener('DOMContentLoaded', function() {
+            const editor = document.getElementById('code-editor');
+            const languageSelect = document.getElementById('language-select');
+            const runBtn = document.getElementById('run-btn');
+            const submitBtn = document.getElementById('submit-btn');
+            const console = document.getElementById('console-output');
+            
+            const codeEditor = CodeMirror(editor, {
+                lineNumbers: true,
+                mode: 'python',
+                theme: 'monokai',
+                indentUnit: 4,
+                lineWrapping: true,
+                value: '# Your Python solution here\n\n'
+            });
+
+            function setDefaultCode() {
+                const language = languageSelect.value;
+                if (language === 'python') {
+                    codeEditor.setValue('# Your Python solution here\n\n');
+                    codeEditor.setOption('mode', 'python');
+                } else if (language === 'c') {
+                    codeEditor.setValue('#include <stdio.h>\n\nint main() {\n    // Your C solution here\n    \n    return 0;\n}');
+                    codeEditor.setOption('mode', 'text/x-csrc');
+                }
+            }
+
+            languageSelect.addEventListener('change', setDefaultCode);
+            setDefaultCode();
+
+            runBtn.addEventListener('click', () => {
+                // Check if contest has ended
+                fetch('/api/timer')
+                    .then(response => response.json())
+                    .then(timerData => {
+                        if (timerData.finished) {
+                            alert('Contest has ended! No more submissions allowed.');
+                            return;
+                        }
+                        
+                        const code = codeEditor.getValue();
+                        const language = languageSelect.value;
+                        
+                        if (!code.trim()) {
+                            console.innerHTML += '<div class="text-red-500 mt-2">[ERROR] No code to execute</div>';
+                            return;
+                        }
+
+                        console.innerHTML += '<div class="text-emerald-500 mt-2">[RUN] Executing code...</div>';
+                        
+                        fetch('/run_code', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ 
+                                code: code, 
+                                language: language,
+                                input: '{{ question.sample_input }}'
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                console.innerHTML += '<div class="text-emerald-400">[OUTPUT] ' + (data.output || 'No output') + '</div>';
+                            } else {
+                                console.innerHTML += '<div class="text-red-500">[ERROR] ' + data.error + '</div>';
+                            }
+                            console.scrollTop = console.scrollHeight;
+                        })
+                        .catch(error => {
+                            console.innerHTML += '<div class="text-red-500">[ERROR] Network error</div>';
+                        });
+                    })
+                    .catch(error => {
+                        console.innerHTML += '<div class="text-red-500">[ERROR] Timer check failed</div>';
+                    });
+            });
+
+            submitBtn.addEventListener('click', () => {
+                // Check if contest has ended
+                fetch('/api/timer')
+                    .then(response => response.json())
+                    .then(timerData => {
+                        if (timerData.finished) {
+                            alert('Contest has ended! No more submissions allowed.');
+                            return;
+                        }
+                        
+                        if (!codeEditor.getValue().trim()) {
+                            alert('Please write some code before submitting!');
+                            return;
+                        }
+                        
+                        if (confirm('Are you sure you want to submit? You can only submit once!')) {
+                            document.getElementById('submit-code').value = codeEditor.getValue();
+                            document.getElementById('submit-language').value = languageSelect.value;
+                            document.getElementById('submit-form').submit();
+                        }
+                    })
+                    .catch(error => {
+                        alert('Error checking contest status. Please try again.');
+                    });
+            });
+        });
+
+        // Timer functionality
+        function updateTimer() {
+            fetch('/api/timer')
+                .then(response => response.json())
+                .then(data => {
+                    const timerElement = document.getElementById('contestTimer');
+                    if (!timerElement) return;
+                    
+                    if (!data.started) {
+                        timerElement.textContent = 'Contest not started';
+                        return;
+                    }
+                    
+                    if (data.finished) {
+                        timerElement.textContent = 'Contest Ended';
+                        timerElement.className = 'text-red-500 font-bold';
+                        return;
+                    }
+                    
+                    const hours = Math.floor(data.remaining / 3600);
+                    const minutes = Math.floor((data.remaining % 3600) / 60);
+                    const seconds = Math.floor(data.remaining % 60);
+                    
+                    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    timerElement.textContent = `Time: ${timeString}`;
+                    
+                    if (data.remaining <= 300) {
+                        timerElement.className = 'text-red-500 font-bold';
+                    } else if (data.remaining <= 900) {
+                        timerElement.className = 'text-yellow-500';
+                    } else {
+                        timerElement.className = 'text-emerald-400';
+                    }
+                })
+                .catch(error => {
+                    console.error('Timer update failed:', error);
+                });
+        }
+        
+        updateTimer();
+        setInterval(updateTimer, 1000);
+    </script>
+</body>
+</html>

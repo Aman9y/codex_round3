@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberCode: {{ story.title }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap');
+        
+        body {
+            font-family: 'Geist Mono', monospace;
+            background-color: #09090b;
+            color: #ecfdf5;
+            overflow-x: hidden;
+        }
+
+        .glitch-text {
+            text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75), -0.025em -0.05em 0 rgba(0, 255, 0, 0.75), 0.025em 0.05em 0 rgba(0, 0, 255, 0.75);
+            animation: glitch 500ms infinite;
+        }
+
+        @keyframes glitch {
+            0% { text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75), -0.05em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
+            15% { text-shadow: -0.05em -0.025em 0 rgba(255, 0, 0, 0.75), 0.025em 0.025em 0 rgba(0, 255, 0, 0.75), -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
+            50% { text-shadow: 0.025em 0.05em 0 rgba(255, 0, 0, 0.75), 0.05em 0 0 rgba(0, 255, 0, 0.75), 0 -0.05em 0 rgba(0, 0, 255, 0.75); }
+            100% { text-shadow: -0.025em 0 0 rgba(255, 0, 0, 0.75), -0.025em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em -0.05em 0 rgba(0, 0, 255, 0.75); }
+        }
+
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 10;
+            background: linear-gradient(0deg, rgba(0, 0, 0, 0) 0%, rgba(16, 185, 129, 0.05) 50%, rgba(0, 0, 0, 0) 100%);
+            position: fixed;
+            bottom: 100%;
+            pointer-events: none;
+            animation: scanline 8s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            100% { bottom: -100%; }
+        }
+
+        .terminal-shadow {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4">
+    <div class="scanline"></div>
+
+    <div class="max-w-4xl mx-auto space-y-6">
+        <!-- Header -->
+        <div class="flex justify-between items-center">
+            <div class="text-[10px] text-emerald-500/50 uppercase">Root@Mainframe:~/Level_{{ current_story_id }}</div>
+            <div class="flex gap-4 text-xs">
+                <div id="contestTimer" class="text-emerald-400"></div>
+                <a href="/leaderboard" class="text-zinc-400 hover:text-emerald-400 uppercase">Leaderboard</a>
+                <a href="/logout" class="text-zinc-400 hover:text-red-400 uppercase">Logout</a>
+            </div>
+        </div>
+
+        <!-- Story Content -->
+        <div class="border border-emerald-900/50 bg-zinc-950/80 p-8 rounded-lg terminal-shadow">
+            <h2 class="text-2xl font-bold text-emerald-500 uppercase glitch-text mb-4">{{ story.title }}</h2>
+            <p class="text-emerald-400/90 leading-relaxed mb-8">{{ story.story_text }}</p>
+            
+            <div class="bg-emerald-950/20 border-l-2 border-emerald-500 p-4 mb-8">
+                <p class="text-[10px] uppercase text-zinc-500 mb-1">Cryptographic_Hint</p>
+                <p class="text-emerald-300 font-bold italic">{{ story.riddle_question }}</p>
+            </div>
+
+            {% if progress and progress.story_solved %}
+                <div class="bg-emerald-900/20 border border-emerald-500/30 p-4 rounded mb-4">
+                    <p class="text-emerald-400 text-sm uppercase font-bold">✓ Riddle Solved - Access Granted</p>
+                </div>
+                <a href="/coding/{{ story.id }}" class="bg-emerald-600 hover:bg-emerald-500 text-black font-bold px-8 py-3 rounded uppercase inline-block">Access Terminal</a>
+            {% else %}
+                <form method="POST" action="/solve_story" class="flex gap-4">
+                    <input type="hidden" name="story_id" value="{{ story.id }}">
+                    <input name="answer" type="text" placeholder="DECRYPT_KEY..." class="flex-1 bg-black border border-emerald-900/50 p-3 rounded text-emerald-500 outline-none focus:border-emerald-500 uppercase">
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-black font-bold px-8 py-3 rounded uppercase">Unlock</button>
+                </form>
+            {% endif %}
+        </div>
+
+        <!-- Hints Section -->
+        {% if hints %}
+        <div class="border border-zinc-800 bg-zinc-950/50 p-6 rounded-lg">
+            <h3 class="text-emerald-500 font-bold uppercase mb-4 text-sm">Available Hints</h3>
+            <div class="space-y-3">
+                {% for hint in hints %}
+                    {% if hint.hint_number in used_hints %}
+                        <div class="bg-zinc-900/50 border border-zinc-700 p-3 rounded">
+                            <p class="text-zinc-400 text-xs uppercase mb-1">Hint {{ hint.hint_number }} [-{{ hint.penalty_points }}pts]</p>
+                            <p class="text-emerald-400">{{ hint.hint_text }}</p>
+                        </div>
+                    {% else %}
+                        <form method="POST" action="/use_hint" class="bg-zinc-900/50 border border-zinc-700 p-3 rounded">
+                            <input type="hidden" name="story_id" value="{{ story.id }}">
+                            <input type="hidden" name="hint_number" value="{{ hint.hint_number }}">
+                            <div class="flex justify-between items-center">
+                                <p class="text-zinc-400 text-xs uppercase">Hint {{ hint.hint_number }} [-{{ hint.penalty_points }}pts]</p>
+                                <button type="submit" class="bg-zinc-700 hover:bg-zinc-600 text-emerald-400 px-3 py-1 rounded text-xs uppercase">Reveal</button>
+                            </div>
+                        </form>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="bg-red-900/20 border border-red-500/30 p-3 rounded text-red-400 text-xs uppercase">
+                    {% for message in messages %}
+                        {{ message }}
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <script>
+    
+        // Anti-cheat protection
+        (function() {
+            'use strict';
+            
+            const ANTI_CHEAT_CONFIG = {
+                enableCopyPasteProtection: true,
+                enableDevToolsProtection: true,
+                enableRightClickProtection: true,
+                enableScreenshotProtection: true,
+                enableTabSwitchDetection: true,
+                showWarnings: true,
+                logViolations: true,
+                serverEndpoint: '/tab-switch'
+            };
+            
+            let tabSwitchCount = 0;
+            let isPageUnloading = false;
+            
+            if (ANTI_CHEAT_CONFIG.enableTabSwitchDetection) {
+                localStorage.removeItem('tabSwitchCount');
+                
+                fetch('/tab-switch-count')
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.count) {
+                            tabSwitchCount = data.count;
+                            localStorage.setItem('tabSwitchCount', tabSwitchCount.toString());
+                        }
+                    })
+                    .catch(e => console.error('Failed to get tab switch count:', e));
+                
+                window.addEventListener('beforeunload', function() {
+                    isPageUnloading = true;
+                });
+                
+                document.addEventListener('visibilitychange', function() {
+                    if (document.hidden && !isPageUnloading) {
+                        tabSwitchCount++;
+                        localStorage.setItem('tabSwitchCount', tabSwitchCount.toString());
+                        
+                        if (ANTI_CHEAT_CONFIG.logViolations) {
+                            console.warn('Tab switch detected:', tabSwitchCount, new Date().toISOString());
+                        }
+                        
+                        fetch(ANTI_CHEAT_CONFIG.serverEndpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ count: tabSwitchCount })
+                        }).catch(e => console.error('Failed to log tab switch:', e));
+                        
+                        if (ANTI_CHEAT_CONFIG.showWarnings) {
+                            showAntiCheatWarning(`Tab switch detected! Count: ${tabSwitchCount}`);
+                        }
+                    }
+                });
+            }
+            
+            document.addEventListener('keydown', function(e) {
+                let blocked = false;
+                let message = '';
+                
+                if (ANTI_CHEAT_CONFIG.enableCopyPasteProtection) {
+                    if (e.ctrlKey && e.key === 'c') {
+                        blocked = true;
+                        message = 'Copy disabled during contest';
+                    } else if (e.ctrlKey && e.key === 'v') {
+                        blocked = true;
+                        message = 'Paste disabled during contest';
+                    } else if (e.ctrlKey && e.key === 'x') {
+                        blocked = true;
+                        message = 'Cut disabled during contest';
+                    }
+                }
+                
+                if (ANTI_CHEAT_CONFIG.enableDevToolsProtection) {
+                    if (e.key === 'F12') {
+                        blocked = true;
+                        message = 'Developer tools are disabled during the contest';
+                    } else if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+                        blocked = true;
+                        message = 'Developer tools are disabled during the contest';
+                    } else if (e.ctrlKey && e.shiftKey && e.key === 'J') {
+                        blocked = true;
+                        message = 'Developer tools are disabled during the contest';
+                    } else if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+                        blocked = true;
+                        message = 'Developer tools are disabled during the contest';
+                    } else if (e.ctrlKey && e.key === 'u') {
+                        blocked = true;
+                        message = 'View source is disabled during the contest';
+                    }
+                }
+                
+                if (ANTI_CHEAT_CONFIG.enableScreenshotProtection) {
+                    if (e.key === 'PrintScreen') {
+                        blocked = true;
+                        message = 'Screenshots are disabled during the contest';
+                    } else if (e.altKey && e.key === 'PrintScreen') {
+                        blocked = true;
+                        message = 'Screenshots are disabled during the contest';
+                    } else if (e.metaKey && e.shiftKey && e.key === 'S') {
+                        blocked = true;
+                        message = 'Screenshots are disabled during the contest';
+                    }
+                }
+                
+                if (blocked) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    if (ANTI_CHEAT_CONFIG.showWarnings) {
+                        showAntiCheatWarning(message);
+                    }
+                    
+                    if (ANTI_CHEAT_CONFIG.logViolations) {
+                        console.warn('Anti-cheat violation:', message, new Date().toISOString());
+                    }
+                    
+                    return false;
+                }
+            });
+            
+            if (ANTI_CHEAT_CONFIG.enableRightClickProtection) {
+                document.addEventListener('contextmenu', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    if (ANTI_CHEAT_CONFIG.showWarnings) {
+                        showAntiCheatWarning('Right-click is disabled during the contest');
+                    }
+                    
+                    if (ANTI_CHEAT_CONFIG.logViolations) {
+                        console.warn('Anti-cheat violation: Right-click attempted', new Date().toISOString());
+                    }
+                    
+                    return false;
+                });
+            }
+            
+            function showAntiCheatWarning(message) {
+                const warningDiv = document.createElement('div');
+                warningDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background-color: #f85149;
+                    color: white;
+                    padding: 10px 15px;
+                    border-radius: 5px;
+                    z-index: 10000;
+                    font-family: 'Geist Mono', monospace;
+                    font-size: 12px;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+                    max-width: 300px;
+                    text-transform: uppercase;
+                `;
+                
+                warningDiv.textContent = message;
+                document.body.appendChild(warningDiv);
+                
+                setTimeout(() => {
+                    if (warningDiv.parentNode) {
+                        warningDiv.parentNode.removeChild(warningDiv);
+                    }
+                }, 3000);
+            }
+            
+            console.log('Anti-cheat protection activated');
+        })();
+
+        // Timer functionality
+        function updateTimer() {
+            fetch('/api/timer')
+                .then(response => response.json())
+                .then(data => {
+                    const timerElement = document.getElementById('contestTimer');
+                    if (!timerElement) return;
+                    
+                    if (!data.started) {
+                        timerElement.textContent = 'Contest not started';
+                        timerElement.className = 'text-zinc-500';
+                        return;
+                    }
+                    
+                    if (data.finished) {
+                        timerElement.textContent = 'Contest Ended';
+                        timerElement.className = 'text-red-500 font-bold';
+                        return;
+                    }
+                    
+                    const hours = Math.floor(data.remaining / 3600);
+                    const minutes = Math.floor((data.remaining % 3600) / 60);
+                    const seconds = Math.floor(data.remaining % 60);
+                    
+                    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    timerElement.textContent = `Time: ${timeString}`;
+                    
+                    if (data.remaining <= 300) {
+                        timerElement.className = 'text-red-500 font-bold';
+                    } else if (data.remaining <= 900) {
+                        timerElement.className = 'text-yellow-500';
+                    } else {
+                        timerElement.className = 'text-emerald-400';
+                    }
+                })
+                .catch(error => {
+                    console.error('Timer update failed:', error);
+                });
+        }
+        
+        if (document.getElementById('contestTimer')) {
+            updateTimer();
+            setInterval(updateTimer, 1000);
+        }
+    </script>
+</body>
+</html>

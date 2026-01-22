@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codex: Contest Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap');
+        
+        body {
+            font-family: 'Geist Mono', monospace;
+            background-color: #09090b;
+            color: #ecfdf5;
+            overflow-x: hidden;
+        }
+
+        .glitch-text {
+            text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75), -0.025em -0.05em 0 rgba(0, 255, 0, 0.75), 0.025em 0.05em 0 rgba(0, 0, 255, 0.75);
+            animation: glitch 500ms infinite;
+        }
+
+        @keyframes glitch {
+            0% { text-shadow: 0.05em 0 0 rgba(255, 0, 0, 0.75), -0.05em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em 0.05em 0 rgba(0, 0, 255, 0.75); }
+            15% { text-shadow: -0.05em -0.025em 0 rgba(255, 0, 0, 0.75), 0.025em 0.025em 0 rgba(0, 255, 0, 0.75), -0.05em -0.05em 0 rgba(0, 0, 255, 0.75); }
+            50% { text-shadow: 0.025em 0.05em 0 rgba(255, 0, 0, 0.75), 0.05em 0 0 rgba(0, 255, 0, 0.75), 0 -0.05em 0 rgba(0, 0, 255, 0.75); }
+            100% { text-shadow: -0.025em 0 0 rgba(255, 0, 0, 0.75), -0.025em -0.025em 0 rgba(0, 255, 0, 0.75), -0.025em -0.05em 0 rgba(0, 0, 255, 0.75); }
+        }
+
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 10;
+            background: linear-gradient(0deg, rgba(0, 0, 0, 0) 0%, rgba(16, 185, 129, 0.05) 50%, rgba(0, 0, 0, 0) 100%);
+            position: fixed;
+            bottom: 100%;
+            pointer-events: none;
+            animation: scanline 8s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            100% { bottom: -100%; }
+        }
+
+        .terminal-shadow {
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+    <div class="scanline"></div>
+
+    <div class="w-full max-w-4xl">
+        <div class="space-y-8 text-center">
+            <div class="space-y-2">
+                <h1 class="text-5xl font-bold tracking-tighter glitch-text uppercase italic text-emerald-500">Codex</h1>
+                <p class="text-zinc-500 text-sm tracking-widest uppercase italic">System Initialized // Codex Contest 2025</p>
+            </div>
+            
+            <div class="bg-zinc-900/50 border border-zinc-800 p-8 rounded-xl terminal-shadow max-w-md mx-auto">
+                <form method="POST" class="space-y-6 text-left">
+                    {% with messages = get_flashed_messages() %}
+                        {% if messages %}
+                            <div class="bg-red-900/20 border border-red-500/30 p-3 rounded text-red-400 text-xs uppercase">
+                                {% for message in messages %}
+                                    {{ message }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endwith %}
+                    
+                    <div class="space-y-2">
+                        <label class="text-zinc-400 text-xs block uppercase">User_ID</label>
+                        <input type="text" name="username" required class="w-full bg-black border border-zinc-800 p-3 rounded text-emerald-500 outline-none focus:border-emerald-500">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-zinc-400 text-xs block uppercase">Access_Key</label>
+                        <input type="password" name="password" required class="w-full bg-black border border-zinc-800 p-3 rounded text-emerald-500 outline-none focus:border-emerald-500">
+                    </div>
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded uppercase tracking-widest transition-colors">Initiate Login</button>
+                </form>
+            </div>
+            <p class="text-zinc-600 text-[10px] uppercase">[ Access restricted to authorized entities ]</p>
+        </div>
+    </div>
+</body>
+</html>
