@@ -43,6 +43,15 @@
         <div class="controls">
             <h3>Timer Controls</h3>
             
+            <div class="extend-form">
+                <label>Set Duration:</label>
+                <input type="number" id="durationHours" value="1" min="0" max="12">
+                <span>hours</span>
+                <input type="number" id="durationMinutes" value="0" min="0" max="59">
+                <span>minutes</span>
+                <button class="btn btn-primary" onclick="setDuration()">Set Duration</button>
+            </div>
+            
             {% if not status.started %}
                 <button class="btn btn-success" onclick="timerAction('start')">Start Contest</button>
             {% endif %}
@@ -62,19 +71,60 @@
 
     <script>
         function timerAction(action) {
+            console.log('Timer action:', action);
+            
             if (action === 'reset' && !confirm('Are you sure you want to reset the timer? This will stop the contest.')) {
                 return;
             }
+            
+            showMessage('Sending request...', 'success');
             
             fetch('/timer/control', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: action })
             })
+            .then(response => {
+                console.log('Response status:', response.status);
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data);
+                if (data.success) {
+                    showMessage('Timer action completed successfully', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showMessage('Error: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+                showMessage('Network error: ' + error, 'error');
+            });
+        }
+        
+        function setDuration() {
+            const hours = document.getElementById('durationHours').value;
+            const minutes = document.getElementById('durationMinutes').value;
+            
+            if (hours < 0 || minutes < 0 || minutes > 59) {
+                showMessage('Please enter valid duration values', 'error');
+                return;
+            }
+            
+            fetch('/timer/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action: 'set_duration', 
+                    hours: parseInt(hours), 
+                    minutes: parseInt(minutes) 
+                })
+            })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    showMessage('Timer action completed successfully', 'success');
+                    showMessage(`Duration set to ${hours}h ${minutes}m`, 'success');
                     setTimeout(() => location.reload(), 1000);
                 } else {
                     showMessage('Error: ' + data.error, 'error');
