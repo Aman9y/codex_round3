@@ -76,7 +76,12 @@
                     </div>
                     <div class="space-y-2">
                         <label class="text-zinc-400 text-xs block uppercase">Access_Key</label>
-                        <input type="password" name="password" required class="w-full bg-black border border-zinc-800 p-3 rounded text-emerald-500 outline-none focus:border-emerald-500">
+                        <div class="relative">
+                            <input type="password" id="password" name="password" required class="w-full bg-black border border-zinc-800 p-3 pr-10 rounded text-emerald-500 outline-none focus:border-emerald-500">
+                            <button type="button" onclick="togglePassword()" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-zinc-400 hover:text-emerald-500 text-xs font-mono">
+                                <span id="eyeIcon">[SHOW]</span>
+                            </button>
+                        </div>
                     </div>
                     <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-black font-bold py-3 rounded uppercase tracking-widest transition-colors">Initiate Login</button>
                 </form>
@@ -84,5 +89,20 @@
             <p class="text-zinc-600 text-[10px] uppercase">[ Access restricted to authorized entities ]</p>
         </div>
     </div>
+    
+    <script>
+        function togglePassword() {
+            const passwordField = document.getElementById('password');
+            const eyeIcon = document.getElementById('eyeIcon');
+            
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+                eyeIcon.textContent = '[HIDE]';
+            } else {
+                passwordField.type = 'password';
+                eyeIcon.textContent = '[SHOW]';
+            }
+        }
+    </script>
 </body>
 </html>
