@@ -393,10 +393,52 @@ def view_randomization():
     </body></html>
     '''
 
-@app.route('/test')
-def test():
-    """Simple test route to check if admin panel is working"""
-    return "<h1>Admin Panel Test</h1><p>Admin panel is working!</p><p><a href='/'>Go to Dashboard</a></p>"
+@app.route('/anticheat')
+@admin_required
+def anticheat_monitor():
+    """Anti-cheat monitoring dashboard"""
+    return render_template('admin/anticheat.html')
+
+@app.route('/api/behavioral-flags')
+@admin_required
+def api_behavioral_flags():
+    """API endpoint for behavioral flags"""
+    conn = get_db()
+    flags = conn.execute('''
+        SELECT team_id, flag_type, details, timestamp
+        FROM behavioral_flags 
+        ORDER BY timestamp DESC
+    ''').fetchall()
+    conn.close()
+    return jsonify({'flags': [dict(flag) for flag in flags]})
+
+@app.route('/api/network-activity')
+@admin_required
+def api_network_activity():
+    """API endpoint for network activity"""
+    conn = get_db()
+    logs = conn.execute('''
+        SELECT team_id, ip_address, user_agent, endpoint, timestamp
+        FROM network_logs 
+        ORDER BY timestamp DESC
+        LIMIT 1000
+    ''').fetchall()
+    conn.close()
+    return jsonify({'logs': [dict(log) for log in logs]})
+
+@app.route('/api/tab-switches')
+@admin_required
+def api_tab_switches():
+    """API endpoint for tab switches"""
+    conn = get_db()
+    switches = conn.execute('''
+        SELECT team_id, MAX(switch_count) as max_switches
+        FROM tab_switches 
+        GROUP BY team_id
+        ORDER BY max_switches DESC
+    ''').fetchall()
+    conn.close()
+    return jsonify({'switches': [dict(sw) for sw in switches]})
 
 if __name__ == '__main__':
     # Check if database exists

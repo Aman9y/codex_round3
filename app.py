@@ -110,18 +110,32 @@ def init_anticheat_database():
     cursor.execute('INSERT OR IGNORE INTO contest_config (key, value) VALUES ("contest_duration", "0")')
     
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS contest_config (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL
-        )
-    ''')
-    
-    cursor.execute('''
         CREATE TABLE IF NOT EXISTS tab_switches (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             team_id TEXT NOT NULL,
             ip_address TEXT,
             switch_count INTEGER,
+            timestamp TEXT NOT NULL
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS network_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            team_id TEXT NOT NULL,
+            ip_address TEXT,
+            user_agent TEXT,
+            endpoint TEXT,
+            timestamp TEXT NOT NULL
+        )
+    ''')
+    
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS behavioral_flags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            team_id TEXT NOT NULL,
+            flag_type TEXT NOT NULL,
+            details TEXT,
             timestamp TEXT NOT NULL
         )
     ''')
@@ -165,6 +179,82 @@ def get_real_ip():
     
     # Fallback to remote_addr
     return request.environ.get('REMOTE_ADDR', 'unknown')
+
+def log_network_activity():
+    """Log network activity for monitoring"""
+    if 'team_id' in session:
+        try:
+            conn = get_db()
+            conn.execute('''
+                INSERT INTO network_logs (team_id, ip_address, user_agent, endpoint, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (session['team_id'], get_real_ip(), request.headers.get('User-Agent', ''), 
+                  request.endpoint, datetime.now().isoformat()))
+            conn.commit()
+            conn.close()
+        except:
+            pass
+
+def check_code_similarity(code, story_id, team_id):
+    """Check for code similarity between teams"""
+    try:
+        conn = get_db()
+        submissions = conn.execute(
+            'SELECT team_id, code FROM submissions WHERE story_id = ? AND team_id != ?',
+            (story_id, team_id)
+        ).fetchall()
+        
+        normalized_code = ''.join(code.split()).lower()
+        
+        for sub in submissions:
+            other_code = ''.join(sub['code'].split()).lower()
+            
+            if len(normalized_code) > 50 and len(other_code) > 50:
+                similarity = len(set(normalized_code) & set(other_code)) / len(set(normalized_code) | set(other_code))
+                if similarity > 0.8:
+                    conn.execute('''
+                        INSERT INTO behavioral_flags (team_id, flag_type, details, timestamp)
+                        VALUES (?, ?, ?, ?)
+                    ''', (team_id, 'code_similarity', f'High similarity with {sub["team_id"]}', datetime.now().isoformat()))
+                    conn.commit()
+        
+        conn.close()
+    except:
+        pass
+
+def check_behavioral_anomalies(team_id):
+    """Check for behavioral anomalies"""
+    try:
+        conn = get_db()
+        
+        # Check for multiple IPs
+        ips = conn.execute(
+            'SELECT DISTINCT ip_address FROM network_logs WHERE team_id = ?',
+            (team_id,)
+        ).fetchall()
+        
+        if len(ips) > 2:
+            conn.execute('''
+                INSERT INTO behavioral_flags (team_id, flag_type, details, timestamp)
+                VALUES (?, ?, ?, ?)
+            ''', (team_id, 'multiple_ips', f'Used {len(ips)} different IPs', datetime.now().isoformat()))
+        
+        # Check for multiple browsers
+        agents = conn.execute(
+            'SELECT DISTINCT user_agent FROM network_logs WHERE team_id = ?',
+            (team_id,)
+        ).fetchall()
+        
+        if len(agents) > 2:
+            conn.execute('''
+                INSERT INTO behavioral_flags (team_id, flag_type, details, timestamp)
+                VALUES (?, ?, ?, ?)
+            ''', (team_id, 'multiple_browsers', f'Used {len(agents)} different browsers', datetime.now().isoformat()))
+        
+        conn.commit()
+        conn.close()
+    except:
+        pass
 
 def get_db():
     """Get database connection with high-performance optimizations"""
@@ -249,6 +339,7 @@ def index():
 @app.route('/login', methods=['GET', 'POST'])
 @rate_limit(max_requests=20, window=300)  # 20 attempts per 5 minutes
 def login():
+    log_network_activity()
     if request.method == 'POST':
         username = request.form['username'].strip()
         password = request.form['password'].strip()
@@ -294,6 +385,8 @@ def logout():
 @login_required
 @contest_active_required
 def story(story_id=None):
+    log_network_activity()
+    check_behavioral_anomalies(session['team_id'])
     conn = get_db()
     
     # Get team's assigned story order (randomized per team)
@@ -451,6 +544,8 @@ def use_hint():
 @login_required
 @contest_active_required
 def coding(story_id):
+    log_network_activity()
+    check_behavioral_anomalies(session['team_id'])
     conn = get_db()
     
     # Check if team has solved the story
@@ -560,6 +655,7 @@ def run_code():
 @contest_active_required
 @rate_limit(max_requests=3, window=300)  # 3 submissions per 5 minutes
 def submit_code():
+    log_network_activity()
     code = request.form.get('code', '').strip()
     language = request.form.get('language', 'python')
     story_id = request.form.get('story_id')
@@ -649,6 +745,9 @@ def submit_code():
     ).fetchone()['penalty']
     
     final_score = max(0, total_score - hint_penalty)
+    
+    # Check code similarity before saving
+    check_code_similarity(code, story_id, session['team_id'])
     
     # Save submission
     conn.execute('''
@@ -806,6 +905,39 @@ def admin_user_sessions():
     
     # Return empty sessions since we removed user_sessions table
     return jsonify({'sessions': []})
+
+@app.route('/admin/behavioral-flags')
+def admin_behavioral_flags():
+    """View behavioral anomaly flags (admin only)"""
+    if not session.get('team_id') or session.get('username') != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    conn = get_db()
+    flags = conn.execute('''
+        SELECT team_id, flag_type, details, timestamp
+        FROM behavioral_flags 
+        ORDER BY timestamp DESC
+    ''').fetchall()
+    conn.close()
+    
+    return jsonify({'flags': [dict(flag) for flag in flags]})
+
+@app.route('/admin/network-activity')
+def admin_network_activity():
+    """View network activity logs (admin only)"""
+    if not session.get('team_id') or session.get('username') != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    conn = get_db()
+    logs = conn.execute('''
+        SELECT team_id, ip_address, user_agent, endpoint, timestamp
+        FROM network_logs 
+        ORDER BY timestamp DESC
+        LIMIT 1000
+    ''').fetchall()
+    conn.close()
+    
+    return jsonify({'logs': [dict(log) for log in logs]})
 
 def execute_code(code, input_data='', language='python', timeout=10):
     """Execute code safely with timeout for multiple languages"""
