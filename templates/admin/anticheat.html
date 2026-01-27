@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Anti-Cheat Monitor</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .nav { background: #333; color: white; padding: 15px; margin-bottom: 20px; }
+        .nav a { color: white; text-decoration: none; margin-right: 20px; }
+        .card { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .flag-high { background: #dc3545; color: white; padding: 2px 8px; border-radius: 4px; }
+        .flag-medium { background: #ffc107; color: black; padding: 2px 8px; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; }
+        .refresh-btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        .refresh-btn:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <h1 style="margin: 0; display: inline;">Contest Admin - Anti-Cheat Monitor</h1>
+        <a href="/">Dashboard</a>
+        <a href="/teams">Teams</a>
+        <a href="/submissions">Submissions</a>
+        <a href="/timer">Timer</a>
+        <a href="/anticheat">Anti-Cheat</a>
+    </div>
+    
+    <div class="container">
+        <div class="card">
+            <h2>🚨 Behavioral Flags</h2>
+            <button class="refresh-btn" onclick="loadFlags()">Refresh</button>
+            <div id="flags"></div>
+        </div>
+        
+        <div class="card">
+            <h2>📱 Tab Switch Violations</h2>
+            <button class="refresh-btn" onclick="loadTabSwitches()">Refresh</button>
+            <div id="tabSwitches"></div>
+        </div>
+        
+        <div class="card">
+            <h2>🌐 Network Activity Summary</h2>
+            <button class="refresh-btn" onclick="loadNetworkSummary()">Refresh</button>
+            <div id="networkSummary"></div>
+        </div>
+    </div>
+
+    <script>
+        function loadFlags() {
+            fetch('/api/behavioral-flags')
+                .then(r => r.json())
+                .then(data => {
+                    let html = '<table><tr><th>Team</th><th>Flag Type</th><th>Details</th><th>Time</th></tr>';
+                    if (data.flags.length === 0) {
+                        html += '<tr><td colspan="4" style="text-align: center; color: #28a745;">No violations detected</td></tr>';
+                    } else {
+                        data.flags.forEach(flag => {
+                            const severity = flag.flag_type.includes('similarity') ? 'flag-high' : 'flag-medium';
+                            html += `<tr><td>${flag.team_id}</td><td><span class="${severity}">${flag.flag_type}</span></td><td>${flag.details}</td><td>${flag.timestamp}</td></tr>`;
+                        });
+                    }
+                    html += '</table>';
+                    document.getElementById('flags').innerHTML = html;
+                });
+        }
+        
+        function loadTabSwitches() {
+            fetch('/api/tab-switches')
+                .then(r => r.json())
+                .then(data => {
+                    let html = '<table><tr><th>Team</th><th>Max Switches</th></tr>';
+                    if (data.switches.length === 0) {
+                        html += '<tr><td colspan="2" style="text-align: center; color: #28a745;">No tab switches detected</td></tr>';
+                    } else {
+                        data.switches.forEach(sw => {
+                            const severity = sw.max_switches > 10 ? 'flag-high' : (sw.max_switches > 5 ? 'flag-medium' : '');
+                            html += `<tr><td>${sw.team_id}</td><td><span class="${severity}">${sw.max_switches}</span></td></tr>`;
+                        });
+                    }
+                    html += '</table>';
+                    document.getElementById('tabSwitches').innerHTML = html;
+                });
+        }
+        
+        function loadNetworkSummary() {
+            fetch('/api/network-activity')
+                .then(r => r.json())
+                .then(data => {
+                    const summary = {};
+                    data.logs.forEach(log => {
+                        if (!summary[log.team_id]) summary[log.team_id] = { ips: new Set(), agents: new Set() };
+                        summary[log.team_id].ips.add(log.ip_address);
+                        summary[log.team_id].agents.add(log.user_agent);
+                    });
+                    
+                    let html = '<table><tr><th>Team</th><th>Unique IPs</th><th>Unique Browsers</th></tr>';
+                    if (Object.keys(summary).length === 0) {
+                        html += '<tr><td colspan="3" style="text-align: center; color: #6c757d;">No network activity logged yet</td></tr>';
+                    } else {
+                        Object.keys(summary).forEach(team => {
+                            const ipCount = summary[team].ips.size;
+                            const agentCount = summary[team].agents.size;
+                            const ipSeverity = ipCount > 2 ? 'flag-high' : (ipCount > 1 ? 'flag-medium' : '');
+                            const agentSeverity = agentCount > 2 ? 'flag-high' : (agentCount > 1 ? 'flag-medium' : '');
+                            html += `<tr><td>${team}</td><td><span class="${ipSeverity}">${ipCount}</span></td><td><span class="${agentSeverity}">${agentCount}</span></td></tr>`;
+                        });
+                    }
+                    html += '</table>';
+                    document.getElementById('networkSummary').innerHTML = html;
+                });
+        }
+        
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            loadFlags();
+            loadTabSwitches();
+            loadNetworkSummary();
+        }, 30000);
+        
+        // Initial load
+        loadFlags();
+        loadTabSwitches();
+        loadNetworkSummary();
+    </script>
+</body>
+</html>
