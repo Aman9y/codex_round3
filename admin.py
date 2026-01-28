@@ -85,7 +85,8 @@ def dashboard():
         # Get recent submissions
         recent_submissions = conn.execute('''
             SELECT s.*, t.username,
-                   CASE WHEN COALESCE(ts.max_switches, 0) > 0 THEN 'Yes' ELSE 'No' END as tab_alert
+                   CASE WHEN COALESCE(ts.max_switches, 0) > 0 THEN 'Yes' ELSE 'No' END as tab_alert,
+                   COALESCE(hu.hints_used, 0) as hints_used
             FROM submissions s 
             JOIN teams t ON s.team_id = t.team_id 
             LEFT JOIN (
@@ -93,6 +94,11 @@ def dashboard():
                 FROM tab_switches 
                 GROUP BY team_id
             ) ts ON s.team_id = ts.team_id
+            LEFT JOIN (
+                SELECT team_id, COUNT(*) as hints_used
+                FROM hints_used
+                GROUP BY team_id
+            ) hu ON s.team_id = hu.team_id
             ORDER BY s.submitted_at DESC 
             LIMIT 10
         ''').fetchall()
@@ -223,9 +229,15 @@ def download_submissions_csv():
     
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(['Team', 'Question', 'Score', 'Tests Passed', 'Total Tests', 'IP Address', 'Submitted At', 'Code'])
+    writer.writerow(['Team', 'Question', 'Score', 'Tests Passed', 'Total Tests', 'IP Address', 'Submitted At', 'Hints Used', 'Code'])
     
     for sub in submissions:
+        # Get hint count for this team
+        hint_count = conn.execute(
+            'SELECT COUNT(*) as count FROM hints_used WHERE team_id = ?',
+            (sub['team_id'],)
+        ).fetchone()['count']
+        
         writer.writerow([
             sub['username'],
             sub['question_title'],
@@ -234,6 +246,7 @@ def download_submissions_csv():
             sub['total_tests'],
             sub['ip_address'] or 'N/A',
             sub['submitted_at'],
+            hint_count,
             sub['code']
         ])
     
