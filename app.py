@@ -530,10 +530,10 @@ def use_hint():
     ).fetchone()
     
     if not existing:
-        # Record hint usage with uniform 10-point penalty
+        # Record hint usage with uniform 1-mark penalty
         conn.execute('''
             INSERT INTO hints_used (team_id, story_id, hint_number, penalty_points)
-            VALUES (?, ?, ?, 10)
+            VALUES (?, ?, ?, 1)
         ''', (session['team_id'], story_id, hint_number))
         conn.commit()
     

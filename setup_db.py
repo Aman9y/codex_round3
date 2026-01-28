@@ -68,15 +68,15 @@ before accessing the coding chamber.''',
     # Hints for each story
     all_hints = [
         # Story 1 hints
-        (1, 1, 'Think about something that consumes oxygen to survive.', 10),
-        (1, 2, 'This element is one of the four classical elements in ancient philosophy.', 15),
-        (1, 3, 'It produces light and heat, and can spread rapidly.', 20),
+        (1, 1, 'Think about something that consumes oxygen to survive.', 1),
+        (1, 2, 'This element is one of the four classical elements in ancient philosophy.', 1),
+        (1, 3, 'It produces light and heat, and can spread rapidly.', 1),
         # Story 2 hints
-        (2, 1, 'Think about something that makes people laugh.', 10),
-        (2, 2, 'It can be a riddle, a pun, or a funny story.', 15),
+        (2, 1, 'Think about something that makes people laugh.', 1),
+        (2, 2, 'It can be a riddle, a pun, or a funny story.', 1),
         # Story 3 hints
-        (3, 1, 'Think about what you create when you walk.', 10),
-        (3, 2, 'Every step you take leaves a mark behind you.', 15)
+        (3, 1, 'Think about what you create when you walk.', 1),
+        (3, 2, 'Every step you take leaves a mark behind you.', 1)
     ]
     
     for story_id, hint_number, hint_text, penalty in all_hints:
