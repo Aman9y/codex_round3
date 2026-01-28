@@ -33,29 +33,33 @@ def setup_database():
     # Multiple stories
     stories = [
         {
-            'title': 'The Mystery of the Lost Algorithm',
-            'story_text': '''In the ancient kingdom of Codelandia, there lived a wise programmer named Ada. 
-She discovered a magical algorithm that could solve any problem in the world. However, one day, 
-the algorithm went missing! The only clue she left behind was a riddle that would reveal the 
-location of her precious algorithm.''',
-            'riddle_question': 'I am not alive, but I grow; I don\'t have lungs, but I need air; I don\'t have a mouth, but water kills me. What am I?',
-            'correct_answer': 'fire'
+            'title': 'The Rotated Array Mystery',
+            'story_text': '''The system logs were once sorted correctly, but during a cyber-attack, a rotation occurred.
+The data is still ordered internally. Your task is to locate a critical value as fast as possible.''',
+            'riddle_question': 'Sorted array rotated to. Still use binary search by finding pivot. What search variant?',
+            'correct_answer': 'rotatedbs'
         },
         {
-            'title': 'The Secret of the Binary Forest',
-            'story_text': '''Deep in the Binary Forest, ancient trees store secrets in their rings. Each ring represents a number, 
-and the forest\'s magic lies in understanding patterns. A young coder must solve the forest\'s riddle 
-to unlock the power of recursive thinking.''',
-            'riddle_question': 'I can be cracked, I can be made, I can be told, I can be played. What am I?',
-            'correct_answer': 'joke'
+            'title': 'The Corrupted Data Stream',
+            'story_text': '''A corrupted data stream is being analyzed.
+The system detects uninterrupted sequences where no character repeats.
+Your task is to find the strongest such signal.''',
+            'riddle_question': 'Slide through "abcabcbb". Stop and restart when any letter repeats. Track longest unique stretch. What string technique?',
+            'correct_answer': 'uniquesubstring'
         },
         {
-            'title': 'The Palindrome Palace Mystery',
-            'story_text': '''In the Palindrome Palace, everything reads the same forwards and backwards. The palace guards 
-speak only in palindromes, and visitors must prove their worth by solving the palace\'s ancient riddle 
-before accessing the coding chamber.''',
-            'riddle_question': 'The more you take, the more you leave behind. What am I?',
-            'correct_answer': 'footsteps'
+            'title': 'The Encrypted Numeric Key',
+            'story_text': '''A numeric key is encrypted into smaller components.
+Each digit contributes to the final checksum.''',
+            'riddle_question': 'Take any number, like 1234. Break it into single digits (1, 2, 3, 4) and add them together. What is this total called in coding problems?',
+            'correct_answer': 'digitsum'
+        },
+        {
+            'title': 'The System Validation Check',
+            'story_text': '''The system validates values based on pairing logic.
+If a number can be perfectly paired, it passes the check.''',
+            'riddle_question': 'If a number divides by 2 with zero remainder, it\'s one type. Otherwise, it\'s the other. What check are you doing?',
+            'correct_answer': 'parity'
         }
     ]
     
@@ -67,16 +71,19 @@ before accessing the coding chamber.''',
     
     # Hints for each story
     all_hints = [
-        # Story 1 hints
-        (1, 1, 'Think about something that consumes oxygen to survive.', 1),
-        (1, 2, 'This element is one of the four classical elements in ancient philosophy.', 1),
-        (1, 3, 'It produces light and heat, and can spread rapidly.', 1),
-        # Story 2 hints
-        (2, 1, 'Think about something that makes people laugh.', 1),
-        (2, 2, 'It can be a riddle, a pun, or a funny story.', 1),
-        # Story 3 hints
-        (3, 1, 'Think about what you create when you walk.', 1),
-        (3, 2, 'Every step you take leaves a mark behind you.', 1)
+        # Story 1 hints - Rotated Array
+        (1, 1, 'Think about binary search with a twist - find the pivot point first.', 1),
+        (1, 2, 'The array is sorted but rotated. Find where the rotation happened.', 1),
+        (1, 3, 'Compare middle element with first/last to determine which half to search.', 1),
+        # Story 2 hints - Unique Substring
+        (2, 1, 'Use a sliding window approach with two pointers.', 1),
+        (2, 2, 'Keep track of characters you\'ve seen and their positions.', 1),
+        # Story 3 hints - Digit Sum
+        (3, 1, 'Extract digits using modulo (%) and division (/) operations.', 1),
+        (3, 2, 'Loop through the number, taking each digit one by one.', 1),
+        # Story 4 hints - Parity
+        (4, 1, 'Use the modulo operator (%) with 2.', 1),
+        (4, 2, 'If remainder is 0, it\'s even. Otherwise, it\'s odd.', 1)
     ]
     
     for story_id, hint_number, hint_text, penalty in all_hints:
@@ -89,59 +96,74 @@ before accessing the coding chamber.''',
     coding_questions = [
         {
             'story_id': 1,
-            'title': 'Ada\'s Factorial Challenge',
-            'problem_statement': '''Ada's lost algorithm was actually a function to calculate factorials!
+            'title': 'Rotated Array Search',
+            'problem_statement': '''Find the index of target value X in a rotated sorted array.
 
-Write a Python program that reads an integer from input and prints its factorial.
+A rotated sorted array is a sorted array that has been rotated at some pivot.
+For example: [4,5,6,7,0,1,2] is a rotation of [0,1,2,4,5,6,7]
 
-Factorial of n (n!) = n × (n-1) × (n-2) × ... × 1
-Example: 5! = 5 × 4 × 3 × 2 × 1 = 120''',
-            'constraints': 'Input: 0 ≤ n ≤ 10',
-            'sample_input': '5',
-            'sample_output': '120',
+Your solution must run in O(log N) time complexity.''',
+            'constraints': 'Array size: 1 ≤ N ≤ 1000\nArray elements: -1000 ≤ arr[i] ≤ 1000\nTarget: -1000 ≤ X ≤ 1000',
+            'sample_input': '7\n4 5 6 7 0 1 2\n0',
+            'sample_output': '4',
             'test_cases': json.dumps([
-                {'input': '5', 'output': '120'},
-                {'input': '0', 'output': '1'},
-                {'input': '1', 'output': '1'},
-                {'input': '3', 'output': '6'}
+                {'input': '7\n4 5 6 7 0 1 2\n0', 'output': '4'},
+                {'input': '7\n4 5 6 7 0 1 2\n3', 'output': '-1'},
+                {'input': '5\n1 2 3 4 5\n3', 'output': '2'},
+                {'input': '4\n2 3 4 1\n1', 'output': '3'}
             ])
         },
         {
             'story_id': 2,
-            'title': 'Binary Forest Fibonacci',
-            'problem_statement': '''The Binary Forest reveals its secret: the Fibonacci sequence!
+            'title': 'Longest Unique Substring',
+            'problem_statement': '''Find the length of the longest substring without repeating characters.
 
-Write a Python program that reads an integer n and prints the nth Fibonacci number.
+Given a string S, return the length of the longest substring that contains all unique characters.
 
-Fibonacci sequence: 0, 1, 1, 2, 3, 5, 8, 13, 21...
-F(0) = 0, F(1) = 1, F(n) = F(n-1) + F(n-2)''',
-            'constraints': 'Input: 0 ≤ n ≤ 20',
-            'sample_input': '6',
-            'sample_output': '8',
+Example: "abcabcbb" → longest unique substring is "abc" with length 3''',
+            'constraints': 'String length: 1 ≤ |S| ≤ 1000\nString contains only ASCII characters',
+            'sample_input': 'abcabcbb',
+            'sample_output': '3',
             'test_cases': json.dumps([
-                {'input': '0', 'output': '0'},
-                {'input': '1', 'output': '1'},
-                {'input': '6', 'output': '8'},
-                {'input': '10', 'output': '55'}
+                {'input': 'abcabcbb', 'output': '3'},
+                {'input': 'bbbbb', 'output': '1'},
+                {'input': 'pwwkew', 'output': '3'},
+                {'input': 'abcdef', 'output': '6'}
             ])
         },
         {
             'story_id': 3,
-            'title': 'Palindrome Palace Checker',
-            'problem_statement': '''The Palindrome Palace needs a guardian program!
+            'title': 'Digit Sum Calculator',
+            'problem_statement': '''Calculate the sum of all digits in a given integer N.
 
-Write a Python program that reads a string and checks if it\'s a palindrome.
-Print "YES" if it\'s a palindrome, "NO" otherwise.
+For example: N = 1234 → sum = 1 + 2 + 3 + 4 = 10
 
-A palindrome reads the same forwards and backwards (ignore case and spaces).''',
-            'constraints': 'Input: string with length ≤ 100',
-            'sample_input': 'racecar',
-            'sample_output': 'YES',
+Handle both positive and negative numbers (ignore the negative sign).''',
+            'constraints': 'Integer range: -10^9 ≤ N ≤ 10^9',
+            'sample_input': '1234',
+            'sample_output': '10',
             'test_cases': json.dumps([
-                {'input': 'racecar', 'output': 'YES'},
-                {'input': 'hello', 'output': 'NO'},
-                {'input': 'A man a plan a canal Panama', 'output': 'YES'},
-                {'input': 'race a car', 'output': 'NO'}
+                {'input': '1234', 'output': '10'},
+                {'input': '0', 'output': '0'},
+                {'input': '999', 'output': '27'},
+                {'input': '-123', 'output': '6'}
+            ])
+        },
+        {
+            'story_id': 4,
+            'title': 'Even or Odd Checker',
+            'problem_statement': '''Determine whether a given integer N is EVEN or ODD.
+
+If N is divisible by 2 (remainder is 0), print "EVEN"
+Otherwise, print "ODD"''',
+            'constraints': 'Integer range: -10^9 ≤ N ≤ 10^9',
+            'sample_input': '4',
+            'sample_output': 'EVEN',
+            'test_cases': json.dumps([
+                {'input': '4', 'output': 'EVEN'},
+                {'input': '7', 'output': 'ODD'},
+                {'input': '0', 'output': 'EVEN'},
+                {'input': '-3', 'output': 'ODD'}
             ])
         }
     ]
