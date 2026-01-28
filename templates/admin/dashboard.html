@@ -56,6 +56,7 @@
                         <th>Tests Passed</th>
                         <th>IP Address</th>
                         <th>Tab Alert</th>
+                        <th>Hints Used</th>
                         <th>Submitted At</th>
                     </tr>
                 </thead>
@@ -67,6 +68,7 @@
                         <td>{{ submission.passed_tests }}/{{ submission.total_tests }}</td>
                         <td>{{ submission.ip_address or 'N/A' }}</td>
                         <td class="{% if submission.tab_alert == 'Yes' %}tab-alert-yes{% endif %}">{{ submission.tab_alert }}</td>
+                        <td>{{ submission.hints_used }}</td>
                         <td>{{ submission.submitted_at }}</td>
                     </tr>
                     {% endfor %}
