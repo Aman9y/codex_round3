@@ -153,7 +153,7 @@ A palindrome reads the same forwards and backwards (ignore case and spaces).''',
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (question['story_id'], question['title'], question['problem_statement'], 
               question['constraints'], question['sample_input'], question['sample_output'],
-              question['test_cases'], 100))
+              question['test_cases'], 12.5))
     
     conn.commit()
     conn.close()

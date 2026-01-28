@@ -727,16 +727,16 @@ def submit_code():
         if test_result['passed']:
             passed += 1
     
-    # Calculate score with new system: 30% story + 70% code
-    base_score = question['base_score']
-    story_points = int(base_score * 0.3)  # 30% for solving story
-    code_points = int(base_score * 0.7)   # 70% for code quality
+    # Calculate score with new system: 30% riddle + 70% code (out of 12.5 marks)
+    base_score = question['base_score']  # 12.5 marks total
+    riddle_marks = base_score * 0.3  # 3.75 marks for solving riddle
+    code_marks = base_score * 0.7    # 8.75 marks for code quality
     
     # Code score based on test cases passed
-    code_score = int((passed / len(test_cases)) * code_points)
+    code_score = (passed / len(test_cases)) * code_marks
     
-    # Total score = story points + code score
-    total_score = story_points + code_score
+    # Total score = riddle marks + code score
+    total_score = riddle_marks + code_score
     
     # Get hint penalties
     hint_penalty = conn.execute(
