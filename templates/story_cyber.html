@@ -94,7 +94,7 @@
                 {% for hint in hints %}
                     {% if hint.hint_number in used_hints %}
                         <div class="bg-zinc-900/50 border border-zinc-700 p-3 rounded">
-                            <p class="text-zinc-400 text-xs uppercase mb-1">Hint {{ hint.hint_number }} [-{{ hint.penalty_points }}pts]</p>
+                            <p class="text-zinc-400 text-xs uppercase mb-1">Hint {{ hint.hint_number }} [-1 mark]</p>
                             <p class="text-emerald-400">{{ hint.hint_text }}</p>
                         </div>
                     {% else %}
@@ -102,7 +102,7 @@
                             <input type="hidden" name="story_id" value="{{ story.id }}">
                             <input type="hidden" name="hint_number" value="{{ hint.hint_number }}">
                             <div class="flex justify-between items-center">
-                                <p class="text-zinc-400 text-xs uppercase">Hint {{ hint.hint_number }} [-{{ hint.penalty_points }}pts]</p>
+                                <p class="text-zinc-400 text-xs uppercase">Hint {{ hint.hint_number }} [-1 mark]</p>
                                 <button type="submit" class="bg-zinc-700 hover:bg-zinc-600 text-emerald-400 px-3 py-1 rounded text-xs uppercase">Reveal</button>
                             </div>
                         </form>
