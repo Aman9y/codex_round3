@@ -410,9 +410,10 @@ def story(story_id=None):
             current_story = randomized_story
             break
     
-    # If all stories completed, show first story
+    # If all stories completed, show completion message
     if not current_story:
-        current_story = story_list[0]
+        conn.close()
+        return render_template('contest_complete_cyber.html')
     
     # If story_id provided, validate it's the current allowed story
     if story_id is not None and story_id != current_story['id']:
