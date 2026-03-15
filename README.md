@@ -1,6 +1,58 @@
 # LAN-Based Story-Driven Coding Contest System
 
-## 🚀 Quick Setup Guide
+## � About
+
+**Codex Round 3** is a comprehensive, LAN-based coding contest platform designed for educational institutions, coding clubs, and competitive programming events. Unlike traditional coding platforms, this system incorporates storytelling elements to make programming challenges more engaging and memorable.
+
+### 🎯 Key Features
+
+- **Story-Driven Challenges**: Each coding problem is tied to an intriguing story and riddle, creating a narrative-driven learning experience
+- **Real-Time Leaderboard**: Live ranking system with automatic score calculation and tie-breaking by submission time
+- **Anti-Cheat Protection**: Comprehensive security measures including copy/paste blocking, dev tools prevention, tab switch detection, and behavioral monitoring
+- **Admin Dashboard**: Separate admin panel for contest management, team monitoring, and real-time statistics
+- **Multi-Language Support**: Currently supports Python and C programming languages
+- **Mobile-Friendly**: Responsive design that works on desktops, tablets, and mobile devices
+- **LAN-Ready**: Designed for local network deployment, perfect for school labs or coding competitions
+- **Hint System**: Progressive hints with penalty points to encourage independent problem-solving
+
+### 🏗️ Architecture
+
+Built with Python Flask and SQLite, the system consists of:
+- **Main Contest App** (`app.py`): Handles team authentication, story progression, code submission, and evaluation
+- **Admin Panel** (`admin.py`): Administrative interface for contest management
+- **Database Layer**: SQLite with comprehensive schema for teams, stories, questions, submissions, and anti-cheat tracking
+- **Security Layer**: JavaScript-based anti-cheat system and server-side validation
+- **Monitoring Tools**: System performance monitoring and contest analytics
+
+### 🎮 Contest Flow
+
+1. **Authentication**: Teams login with pre-assigned credentials
+2. **Story Engagement**: Read engaging stories and solve riddles to unlock coding challenges
+3. **Problem Solving**: Access coding problems with constraints, sample I/O, and test cases
+4. **Code Submission**: Submit solutions with automatic evaluation and partial scoring
+5. **Progression**: Unlock subsequent stories by solving previous challenges
+6. **Competition**: Real-time leaderboard shows team rankings and progress
+
+### 🛡️ Security & Fairness
+
+- Session-based authentication with secure cookies
+- Code execution in isolated sandbox with 10-second timeout
+- Rate limiting on submissions and login attempts
+- Comprehensive logging for audit trails
+- Anti-cheat measures prevent unauthorized assistance
+- Single submission enforcement per challenge
+
+### 📊 Scoring System
+
+- Base score of 100 points per coding challenge
+- Partial credit based on test case success rate
+- Hint penalties (-10 to -20 points per hint used)
+- Tie-breaking by earliest submission time
+- Live leaderboard updates every 10 seconds
+
+This platform transforms traditional coding contests into immersive, story-driven experiences that motivate participants while maintaining academic integrity and competitive fairness.
+
+## �🚀 Quick Setup Guide
 
 ### 1. Install Dependencies
 ```bash
