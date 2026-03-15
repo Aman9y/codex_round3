@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, session, render_template_string
 import sqlite3
 import bcrypt
 import time
@@ -6,12 +6,134 @@ import csv
 import io
 import random
 import os
+import hashlib
 from functools import wraps
 from threading import Lock
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'contest-admin-secret-key-2024'
 DATABASE = 'database/contest.db'
+
+# Anti-cheat system
+class AntiCheatSystem:
+    def __init__(self, database_path):
+        self.database_path = database_path
+        self.init_database()
+    
+    def init_database(self):
+        conn = sqlite3.connect(self.database_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS behavioral_flags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_id TEXT NOT NULL,
+                flag_type TEXT NOT NULL,
+                details TEXT,
+                timestamp TEXT NOT NULL
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS network_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_id TEXT NOT NULL,
+                ip_address TEXT,
+                user_agent TEXT,
+                endpoint TEXT,
+                timestamp TEXT NOT NULL
+            )
+        ''')
+        conn.commit()
+        conn.close()
+    
+    def get_real_ip(self):
+        forwarded_ips = [
+            request.headers.get('X-Forwarded-For'),
+            request.headers.get('X-Real-IP'),
+            request.headers.get('CF-Connecting-IP')
+        ]
+        for ip_header in forwarded_ips:
+            if ip_header:
+                ip = ip_header.split(',')[0].strip()
+                if ip and ip != '127.0.0.1':
+                    return ip
+        return request.environ.get('REMOTE_ADDR', 'unknown')
+    
+    def log_network_activity(self):
+        if 'team_id' in session:
+            try:
+                conn = sqlite3.connect(self.database_path)
+                conn.execute('''
+                    INSERT INTO network_logs (team_id, ip_address, user_agent, endpoint, timestamp)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (session['team_id'], self.get_real_ip(), 
+                      request.headers.get('User-Agent', ''), 
+                      request.endpoint, datetime.now().isoformat()))
+                conn.commit()
+                conn.close()
+            except:
+                pass
+    
+    def check_code_similarity(self, code, question_id, team_id):
+        try:
+            conn = sqlite3.connect(self.database_path)
+            submissions = conn.execute(
+                'SELECT team_id, code FROM submissions WHERE story_id = ? AND team_id != ?',
+                (question_id, team_id)
+            ).fetchall()
+            
+            normalized_code = ''.join(code.split()).lower()
+            
+            for sub in submissions:
+                other_code = ''.join(sub[1].split()).lower()
+                
+                if len(normalized_code) > 50 and len(other_code) > 50:
+                    similarity = len(set(normalized_code) & set(other_code)) / len(set(normalized_code) | set(other_code))
+                    if similarity > 0.8:
+                        conn.execute('''
+                            INSERT INTO behavioral_flags (team_id, flag_type, details, timestamp)
+                            VALUES (?, ?, ?, ?)
+                        ''', (team_id, 'code_similarity', f'High similarity with {sub[0]}', datetime.now().isoformat()))
+                        conn.commit()
+            
+            conn.close()
+        except:
+            pass
+    
+    def check_behavioral_anomalies(self, team_id):
+        try:
+            conn = sqlite3.connect(self.database_path)
+            
+            # Check multiple IPs
+            ips = conn.execute(
+                'SELECT DISTINCT ip_address FROM network_logs WHERE team_id = ?',
+                (team_id,)
+            ).fetchall()
+            
+            if len(ips) > 2:
+                conn.execute('''
+                    INSERT INTO behavioral_flags (team_id, flag_type, details, timestamp)
+                    VALUES (?, ?, ?, ?)
+                ''', (team_id, 'multiple_ips', f'Used {len(ips)} different IPs', datetime.now().isoformat()))
+            
+            # Check multiple browsers
+            agents = conn.execute(
+                'SELECT DISTINCT user_agent FROM network_logs WHERE team_id = ?',
+                (team_id,)
+            ).fetchall()
+            
+            if len(agents) > 2:
+                conn.execute('''
+                    INSERT INTO behavioral_flags (team_id, flag_type, details, timestamp)
+                    VALUES (?, ?, ?, ?)
+                ''', (team_id, 'multiple_browsers', f'Used {len(agents)} different browsers', datetime.now().isoformat()))
+            
+            conn.commit()
+            conn.close()
+        except:
+            pass
+
+anticheat = AntiCheatSystem(DATABASE)
 
 # Simple cache for leaderboard
 cache = {}
@@ -452,6 +574,192 @@ def api_tab_switches():
     ''').fetchall()
     conn.close()
     return jsonify({'switches': [dict(sw) for sw in switches]})
+
+# Anti-cheat routes
+@app.route('/tab-switch', methods=['POST'])
+def log_tab_switch():
+    if not session.get('team_id'):
+        return jsonify({'error': 'Authentication required'}), 401
+    
+    try:
+        data = request.get_json()
+        team_id = session.get('team_id')
+        count = data.get('count', 0)
+        user_ip = anticheat.get_real_ip()
+        
+        conn = get_db()
+        conn.execute('INSERT INTO tab_switches (team_id, ip_address, switch_count, timestamp) VALUES (?, ?, ?, ?)',
+                    (team_id, user_ip, count, datetime.now().isoformat()))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True})
+    except:
+        return jsonify({'error': 'Failed to log tab switch'}), 500
+
+@app.route('/admin/behavioral-flags')
+@admin_required
+def admin_behavioral_flags():
+    conn = get_db()
+    flags = conn.execute('''
+        SELECT team_id, flag_type, details, timestamp
+        FROM behavioral_flags 
+        ORDER BY timestamp DESC
+    ''').fetchall()
+    conn.close()
+    
+    return jsonify({'flags': [{'team_id': f[0], 'flag_type': f[1], 'details': f[2], 'timestamp': f[3]} for f in flags]})
+
+@app.route('/admin/network-activity')
+@admin_required
+def admin_network_activity():
+    conn = get_db()
+    logs = conn.execute('''
+        SELECT team_id, ip_address, user_agent, endpoint, timestamp
+        FROM network_logs 
+        ORDER BY timestamp DESC
+        LIMIT 1000
+    ''').fetchall()
+    conn.close()
+    
+    return jsonify({'logs': [{'team_id': l[0], 'ip_address': l[1], 'user_agent': l[2], 'endpoint': l[3], 'timestamp': l[4]} for l in logs]})
+
+@app.route('/admin/tab-switches')
+@admin_required
+def admin_tab_switches():
+    conn = get_db()
+    switches = conn.execute('''
+        SELECT team_id, MAX(switch_count) as max_switches
+        FROM tab_switches 
+        GROUP BY team_id
+        ORDER BY max_switches DESC
+    ''').fetchall()
+    conn.close()
+    
+    return jsonify({'switches': [{'team_id': s[0], 'max_switches': s[1]} for s in switches]})
+
+@app.route('/admin/anticheat')
+@admin_required
+def anticheat_monitor():
+    return render_template_string('''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Anti-Cheat Monitor</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .card { background: white; padding: 20px; margin: 20px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .flag-high { background: #dc3545; color: white; padding: 2px 8px; border-radius: 4px; }
+        .flag-medium { background: #ffc107; color: black; padding: 2px 8px; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f8f9fa; }
+        .refresh-btn { background: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Anti-Cheat Monitoring Dashboard</h1>
+        <p><a href="/">← Back to Dashboard</a></p>
+        
+        <div class="card">
+            <h2>🚨 Behavioral Flags</h2>
+            <button class="refresh-btn" onclick="loadFlags()">Refresh</button>
+            <div id="flags"></div>
+        </div>
+        
+        <div class="card">
+            <h2>📱 Tab Switch Violations</h2>
+            <button class="refresh-btn" onclick="loadTabSwitches()">Refresh</button>
+            <div id="tabSwitches"></div>
+        </div>
+        
+        <div class="card">
+            <h2>🌐 Network Activity Summary</h2>
+            <button class="refresh-btn" onclick="loadNetworkSummary()">Refresh</button>
+            <div id="networkSummary"></div>
+        </div>
+    </div>
+
+    <script>
+        function loadFlags() {
+            fetch('/admin/behavioral-flags')
+                .then(r => r.json())
+                .then(data => {
+                    let html = '<table><tr><th>Team</th><th>Flag Type</th><th>Details</th><th>Time</th></tr>';
+                    if (data.flags.length === 0) {
+                        html += '<tr><td colspan="4" style="text-align: center; color: #28a745;">No violations detected</td></tr>';
+                    } else {
+                        data.flags.forEach(flag => {
+                            const severity = flag.flag_type.includes('similarity') ? 'flag-high' : 'flag-medium';
+                            html += `<tr><td>${flag.team_id}</td><td><span class="${severity}">${flag.flag_type}</span></td><td>${flag.details}</td><td>${flag.timestamp}</td></tr>`;
+                        });
+                    }
+                    html += '</table>';
+                    document.getElementById('flags').innerHTML = html;
+                });
+        }
+        
+        function loadTabSwitches() {
+            fetch('/admin/tab-switches')
+                .then(r => r.json())
+                .then(data => {
+                    let html = '<table><tr><th>Team</th><th>Max Switches</th></tr>';
+                    if (data.switches.length === 0) {
+                        html += '<tr><td colspan="2" style="text-align: center; color: #28a745;">No tab switches detected</td></tr>';
+                    } else {
+                        data.switches.forEach(sw => {
+                            const severity = sw.max_switches > 10 ? 'flag-high' : (sw.max_switches > 5 ? 'flag-medium' : '');
+                            html += `<tr><td>${sw.team_id}</td><td><span class="${severity}">${sw.max_switches}</span></td></tr>`;
+                        });
+                    }
+                    html += '</table>';
+                    document.getElementById('tabSwitches').innerHTML = html;
+                });
+        }
+        
+        function loadNetworkSummary() {
+            fetch('/admin/network-activity')
+                .then(r => r.json())
+                .then(data => {
+                    const summary = {};
+                    data.logs.forEach(log => {
+                        if (!summary[log.team_id]) summary[log.team_id] = { ips: new Set(), agents: new Set() };
+                        summary[log.team_id].ips.add(log.ip_address);
+                        summary[log.team_id].agents.add(log.user_agent);
+                    });
+                    
+                    let html = '<table><tr><th>Team</th><th>Unique IPs</th><th>Unique Browsers</th></tr>';
+                    if (Object.keys(summary).length === 0) {
+                        html += '<tr><td colspan="3" style="text-align: center; color: #6c757d;">No network activity logged yet</td></tr>';
+                    } else {
+                        Object.keys(summary).forEach(team => {
+                            const ipCount = summary[team].ips.size;
+                            const agentCount = summary[team].agents.size;
+                            const ipSeverity = ipCount > 2 ? 'flag-high' : (ipCount > 1 ? 'flag-medium' : '');
+                            const agentSeverity = agentCount > 2 ? 'flag-high' : (agentCount > 1 ? 'flag-medium' : '');
+                            html += `<tr><td>${team}</td><td><span class="${ipSeverity}">${ipCount}</span></td><td><span class="${agentSeverity}">${agentCount}</span></td></tr>`;
+                        });
+                    }
+                    html += '</table>';
+                    document.getElementById('networkSummary').innerHTML = html;
+                });
+        }
+        
+        setInterval(() => {
+            loadFlags();
+            loadTabSwitches();
+            loadNetworkSummary();
+        }, 30000);
+        
+        loadFlags();
+        loadTabSwitches();
+        loadNetworkSummary();
+    </script>
+</body>
+</html>
+    ''')
 
 if __name__ == '__main__':
     # Check if database exists
